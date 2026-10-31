@@ -2055,6 +2055,8 @@ function dueItems(loans, employees, batches, periodStart, periodEnd, asOf, allow
   const employeesById = new Map(employees.map(e => [String(e.id), e]));
   return loans.flatMap(loan => {
     const employee = employeesById.get(String(loan.employee_id));
+    // Only cash advances are deducted; company loan records saved before are kept but no longer scheduled.
+    if (loan.record_type !== 'Cash Advance') return [];
     if (!employee || (!allowInactive && !activeEmployee(employee)) || loan.approval_status !== 'Approved') return [];
     if (asOf && (String(loan.created_at ?? '') > asOf || String(loan.approved_at ?? '') > asOf)) return [];
     const start = String(loan.repayment_start_date ?? '').slice(0, 10), release = String(loan.release_date ?? '').slice(0, 10);
@@ -2181,8 +2183,9 @@ app.post('/loans', auth, allow('loans.manage'), async (req, res) => {
   const employee = await first('employees', { id: employeeId });
   if (!employee || employee.deleted_at) throw new HttpError(404, 'EMPLOYEE_NOT_FOUND', 'The selected employee was not found in Employee Management.');
   if (!activeEmployee(employee)) throw new HttpError(409, 'EMPLOYEE_NOT_ACTIVE', 'Only active employees may receive a loan or cash advance.');
+  // Cash advances only: SSS and Pag-IBIG loans are recorded in Government Loans.
   const recordType = text(b.record_type);
-  if (!Object.prototype.hasOwnProperty.call(loanTypes, recordType)) throw new HttpError(400, 'INVALID_LOAN_TYPE', 'Select Loan or Cash Advance.');
+  if (recordType !== 'Cash Advance') throw new HttpError(400, 'INVALID_LOAN_TYPE', 'Only cash advances can be recorded here. SSS and Pag-IBIG loans go in Government Loans.');
   const loanType = required(b.loan_type, 'loan_type');
   if (!loanTypes[recordType].includes(loanType)) throw new HttpError(400, 'INVALID_LOAN_CATEGORY', 'The selected purpose type does not match this record.');
   const purpose = required(b.purpose, 'purpose');

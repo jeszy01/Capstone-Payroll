@@ -5,6 +5,7 @@ import type {PayrollRun,RunRow} from '../payroll/payrollRuns';
 import {computeThirteenthMonth,loadThirteenthMonthRules,releaseDeadlineFor} from '../payroll/thirteenthMonth';
 import {hmoService} from '../hmo/hmoService';
 import {loanService} from '../deductions/loanService';
+import {governmentLoanService} from '../governmentLoans/governmentLoanService';
 import {fetchClaimTotals,normalizeClaims} from '../claims/claimsTypes';
 import {can} from '../auth/permissions';
 import {claimTypes} from '../claims/claimsTypes';
@@ -46,7 +47,7 @@ export const REPORTS:Array<{group:string;items:Array<{id:ReportId;title:string;d
  ]},
  {group:'Deductions & Claims',items:[
   {id:'deductions',title:'Deductions Breakdown',description:'All deductions per employee by type'},
-  {id:'loans',title:'Loans & Cash Advances',description:'Outstanding balance and monthly amortization'},
+  {id:'loans',title:'Cash Advances & Loans',description:'Cash advances and government loans: outstanding balance and monthly amortization'},
   {id:'claims',title:'Claims & Reimbursements',description:'Submitted, approved, rejected and paid claims'},
  ]},
 ];
@@ -107,13 +108,17 @@ export async function buildReport(id:ReportId,context:ReportContext):Promise<Rep
    rows:rows.map(row=>[row.name,row.plan,peso(row.company),peso(row.member),row.effective?new Date(`${row.effective}T00:00:00`).toLocaleDateString('en-PH',{dateStyle:'medium'}):'—'])};
  }
  if(id==='loans'){
-  const {loans}=await loanService.list();
+  const [{loans},government]=await Promise.all([loanService.list(),governmentLoanService.list().then(result=>result.loans).catch(()=>[])]);
   const perMonth=loadRates().payPeriodsPerMonth===1?1:2;
-  const open=loans.filter(loan=>loan.approvalStatus==='Approved'&&loan.outstandingBalance>0).sort((a,b)=>a.employeeName.localeCompare(b.employeeName));
-  const monthly=(loan:(typeof open)[number])=>loan.installmentAmount*(loan.repaymentFrequency==='Per Payroll'?perMonth:1);
-  return {...base,period:'As of today',summary:tones([['Open records',String(open.length)],['Loans',count(open.filter(loan=>loan.recordType==='Loan').length,'record')],['Outstanding balance',peso(sum(open.map(loan=>loan.outstandingBalance)))],['Monthly amortization',peso(sum(open.map(monthly)))]]),
+  const advances=loans.filter(loan=>loan.recordType==='Cash Advance'&&loan.approvalStatus==='Approved'&&loan.outstandingBalance>0);
+  const monthly=(loan:(typeof advances)[number])=>loan.installmentAmount*(loan.repaymentFrequency==='Per Payroll'?perMonth:1);
+  const open=[
+   ...advances.map(loan=>({name:loan.employeeName,type:'Cash Advance',principal:loan.principalAmount,balance:loan.outstandingBalance,monthly:monthly(loan),payments:`${loan.repaymentsCompleted} of ${loan.installmentCount}`})),
+   ...government.filter(loan=>loan.status==='Active'&&loan.outstandingBalance>0).map(loan=>({name:loan.employeeName,type:`${loan.loanType} Loan`,principal:loan.totalAmount,balance:loan.outstandingBalance,monthly:loan.monthlyAmortization,payments:'—'})),
+  ].sort((a,b)=>a.name.localeCompare(b.name));
+  return {...base,period:'As of today',summary:tones([['Open records',String(open.length)],['Cash advances',count(advances.length,'record')],['Outstanding balance',peso(sum(open.map(loan=>loan.balance)))],['Monthly amortization',peso(sum(open.map(loan=>loan.monthly)))]]),
    columns:['Employee','Type','Principal','Outstanding balance','Monthly amortization','Payments made'],numeric:[2,3,4,5],
-   rows:open.map(loan=>[loan.employeeName,loan.recordType==='Loan'?loan.loanType||'Loan':'Cash Advance',peso(loan.principalAmount),peso(loan.outstandingBalance),peso(monthly(loan)),`${loan.repaymentsCompleted} of ${loan.installmentCount}`])};
+   rows:open.map(loan=>[loan.name,loan.type,peso(loan.principal),peso(loan.balance),peso(loan.monthly),loan.payments])};
  }
  // Roles that may not view claims (Finance) get totals by claim type, without employees or receipts.
  if(!can('claims.view')){

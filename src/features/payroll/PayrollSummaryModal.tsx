@@ -8,6 +8,8 @@ import {rowLoanAmounts} from '../governmentLoans/governmentLoanPayroll';
 import {employerShares} from './payrollCalculator';
 import {loadRates} from '../settings/payrollSettings';
 import {formatDate} from '../../utils/date';
+// Loans recorded in PBMS before cash advances replaced them: shown only on payrolls that deducted them.
+const LEGACY_LOANS=new Set(['SSS loan (employee)','Pag-IBIG loan (employee)','Company loan']);
 
 const sum=(rows:RunRow[],pick:(row:RunRow)=>number)=>rows.reduce((total,row)=>total+(pick(row)||0),0);
 const COLORS={net:'#0e6b58',stat:'#2f4c8c',att:'#c27a12',co:'#7a5c9e'};
@@ -51,7 +53,7 @@ export function PayrollSummaryModal({run,employees,onClose}:{run:PayrollRun;empl
       ['Pag-IBIG',stat[2][1],sum(rows,r=>employer(r).employerPagibig)],
       ['Withholding tax',stat[3][1],null],
     ];
-    const company:[string,number][]=[
+    const company:[string,number][]=([
       ['HMO',sum(rows,r=>r.hmo)],
       ['SSS loan (employee)',sum(rows,r=>rowLoanAmounts(r.input,r.governmentLoans).sssLoan)],
       ['Pag-IBIG loan (employee)',sum(rows,r=>rowLoanAmounts(r.input,r.governmentLoans).pagibigLoan)],
@@ -60,7 +62,7 @@ export function PayrollSummaryModal({run,employees,onClose}:{run:PayrollRun;empl
       ['SSS government loan',sum(rows,r=>rowLoanAmounts(r.input,r.governmentLoans).govSssLoan)],
       ['Pag-IBIG government loan',sum(rows,r=>rowLoanAmounts(r.input,r.governmentLoans).govPagibigLoan)],
       ['Other deductions',sum(rows,r=>numberValue(r.input.otherDeductions))],
-    ];
+    ] satisfies [string,number][]).filter(([label,amount])=>amount!==0||!LEGACY_LOANS.has(label));
     const gross=sum(rows,r=>r.result.gross);
     const deductions=sum(rows,r=>r.result.deductions);
     const net=sum(rows,r=>r.result.net);

@@ -94,8 +94,9 @@ export async function computeRunRows(run:RunScope,rates:PayrollRates):Promise<Ru
   const allowance=allowancePay(paidDays?activeAllowances(rewards,employeeIds,to):[],rates.payPeriodsPerMonth,to,undefined,deMinimisUsed(read<PayrollRun[]>(RUNS_KEY,[]),employee.employeeNo,run));
   // The same HMO cutoff deduction shown under Deductions → HMO.
   const hmo=hmoCutoffDeduction(hmoLines,employee.id),hmoCompany=hmoCompanyCutoffShare(hmoLines,employee.id);
-  const loanRepayments=scheduledLoans.filter(installment=>installment.employeeId===employee.id);
-  const loanAmounts=loanRepayments.reduce((sum,installment)=>{if(installment.recordType==='Cash Advance')sum.cashAdvance+=installment.amount;else if(installment.loanType==='SSS Loan')sum.sssLoan+=installment.amount;else if(installment.loanType==='Pag-IBIG Loan')sum.pagibigLoan+=installment.amount;else sum.companyLoan+=installment.amount;return sum},{sssLoan:0,pagibigLoan:0,companyLoan:0,cashAdvance:0});
+  // Cash advance installments only; SSS and Pag-IBIG loans come from Government Loans.
+  const loanRepayments=scheduledLoans.filter(installment=>installment.employeeId===employee.id&&installment.recordType==='Cash Advance');
+  const loanAmounts={cashAdvance:loanRepayments.reduce((sum,installment)=>sum+installment.amount,0)};
   // The daily rate from computeDeductions (the grade's whole-peso daily rate, or salary ÷ working days), the same rate
   // Deductions shows late and undertime with.
   const dailyRate=item.dailyRate;
@@ -131,7 +132,7 @@ export async function submitBlocked(run:PayrollRun,runs:PayrollRun[]):Promise<st
  if(!isThirteenthMonthRun(run)){
   const [employees,schedule]=await Promise.all([employeeService.getAllFromServer(),loanService.schedule(from,to)]);
   const numbers=new Set(run.rows.map(row=>row.input.empId));
-  const current=schedule.filter(item=>{const employee=employees.find(candidate=>candidate.id===item.employeeId);return Boolean(employee&&numbers.has(employee.employeeNo))});
+  const current=schedule.filter(item=>{if(item.recordType!=='Cash Advance')return false;const employee=employees.find(candidate=>candidate.id===item.employeeId);return Boolean(employee&&numbers.has(employee.employeeNo))});
   const signature=(items:Array<{loanId:string;employeeId:string;amount:number;recordType:string;loanType:string;installmentNumber:number;installmentCount:number}>)=>items.map(item=>`${item.loanId}|${item.employeeId}|${item.amount.toFixed(2)}|${item.recordType}|${item.loanType}|${item.installmentNumber}|${item.installmentCount}`).sort().join('\n');
   if(signature(run.rows.flatMap(row=>row.loanRepayments??[]))!==signature(current))return 'The approved loan schedule changed after this payroll was computed. Recompute it before submitting.';
   if(isYearEndRun(run,rates))return finalCutoffBlocked(others,year);

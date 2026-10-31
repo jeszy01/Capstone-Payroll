@@ -8,7 +8,8 @@ import type {ClaimPayment,PaymentMethod,ReimbursementBatch} from '../features/cl
 import {can} from '../features/auth/permissions';
 import {getCurrentUser} from '../features/auth/authService';
 import type {ExpenseClaim} from '../features/claims/claimsTypes';
-import {ClaimStatusBadge,EmployeeCell,cell,claimDate,flushCard,localToday,openClaimFile,rowHeader,tableHead} from '../features/claims/claimsUi';
+import {ClaimStatusBadge,EmployeeCell,cell,claimDate,flushCard,localToday,rowHeader,tableHead} from '../features/claims/claimsUi';
+import {ClaimFileModal} from '../features/claims/ClaimFileViewer';
 import {bankFileRecords,downloadCsv,missingPayout,payoutAccount,payoutDetailsFor} from '../features/payroll/payouts';
 import {StatusBadge} from '../components/common/StatusBadge';
 import {peso} from '../utils/storage';
@@ -147,7 +148,7 @@ function CreateBatchModal({claims,employees,onClose,onCreated}:{claims:ExpenseCl
 }
 
 function Batches({batches,claims,employees,onChanged}:{batches:ReimbursementBatch[];claims:ExpenseClaim[];employees:Employee[];onChanged:()=>void}){
-  const[paying,setPaying]=useState<ReimbursementBatch|null>(null),[cancelling,setCancelling]=useState<ReimbursementBatch|null>(null);
+  const[paying,setPaying]=useState<ReimbursementBatch|null>(null),[cancelling,setCancelling]=useState<ReimbursementBatch|null>(null),[proof,setProof]=useState<ExpenseClaim|null>(null);
   const sorted=[...batches].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   const proofClaim=(batch:ReimbursementBatch)=>claims.find(claim=>(batch.paidClaimIds??[]).includes(claim.id)&&claim.hasPaymentProof);
   return <>
@@ -164,11 +165,12 @@ function Batches({batches,claims,employees,onChanged}:{batches:ReimbursementBatc
         <td className={cell}><div className="flex flex-wrap gap-2">
           {batch.status!=='Cancelled'&&<button type="button" className={ghost} onClick={()=>downloadBankFile(batch,claims,employees)}><Download size={14}/>Bank file</button>}
           {batch.status==='Exported'&&can('claims.pay')&&<><Button onClick={()=>setPaying(batch)}><Check size={14}/>Mark paid</Button><button type="button" className={`${ghost} text-red-700`} onClick={()=>setCancelling(batch)}>Cancel</button></>}
-          {batch.status==='Paid'&&proofClaim(batch)&&<button type="button" className={ghost} onClick={()=>void openClaimFile(proofClaim(batch)!,'proof')}>View proof</button>}
+          {batch.status==='Paid'&&proofClaim(batch)&&<button type="button" className={ghost} onClick={()=>setProof(proofClaim(batch)!)}>View proof</button>}
         </div></td>
       </tr>)}</tbody></table></div>
     {paying&&<MarkBatchPaidModal batch={paying} claims={claims} employees={employees} onClose={()=>setPaying(null)} onPaid={()=>{setPaying(null);onChanged()}}/>}
     {cancelling&&<CancelBatchModal batch={cancelling} onClose={()=>setCancelling(null)} onCancelled={()=>{setCancelling(null);onChanged()}}/>}
+    {proof&&<ClaimFileModal claim={proof} kind="proof" onClose={()=>setProof(null)}/>}
   </>;
 }
 
@@ -272,7 +274,8 @@ function PaymentModal({claim,onClose,onPaid}:{claim:ExpenseClaim;onClose:()=>voi
 }
 
 function ReimbursementHistory({claims,employees}:{claims:ExpenseClaim[];employees:Employee[]}){
-  return <div role="region" aria-label="Reimbursement history table" tabIndex={0} className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"><table className="w-full min-w-[1040px] text-left text-[13px]"><caption className="sr-only">Completed reimbursements with claim number, employee, amount, payment date, how they were paid, reference, who recorded them and the proof.</caption>
+  const[proof,setProof]=useState<ExpenseClaim|null>(null);
+  return <><div role="region" aria-label="Reimbursement history table" tabIndex={0} className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"><table className="w-full min-w-[1040px] text-left text-[13px]"><caption className="sr-only">Completed reimbursements with claim number, employee, amount, payment date, how they were paid, reference, who recorded them and the proof.</caption>
     <thead><tr className={tableHead}>{['Claim No.','Employee','Type','Amount','Paid On','Paid By','Reference','Recorded By','Proof'].map(header=><th key={header} scope="col" className={`whitespace-nowrap px-4 py-3.5 ${header==='Amount'?'text-right':''}`}>{header}</th>)}</tr></thead>
     <tbody>{claims.length===0?<tr><td colSpan={9}><Empty>No reimbursement history yet.</Empty></td></tr>:claims.map(claim=><tr key={claim.id} className="border-b border-gray-100 transition-colors hover:bg-blue-50/35">
       <th scope="row" className={rowHeader}>{claim.claimNumber}</th>
@@ -283,6 +286,8 @@ function ReimbursementHistory({claims,employees}:{claims:ExpenseClaim[];employee
       <td className={`${cell} whitespace-nowrap text-gray-700`}>{claim.paymentMethod||'—'}{claim.batchNumber&&<div className="text-[11px] text-gray-500">Batch {claim.batchNumber}</div>}</td>
       <td className={`${cell} whitespace-nowrap text-gray-700`}>{claim.paymentReference||'—'}</td>
       <td className={`${cell} whitespace-nowrap text-gray-600`}>{claim.paidBy||'—'}</td>
-      <td className={`${cell} whitespace-nowrap`}>{claim.hasPaymentProof?<button type="button" className="font-medium text-blue-600 hover:text-blue-800 hover:underline" title={claim.paymentProofName} onClick={()=>void openClaimFile(claim,'proof')}>View proof</button>:<span className="text-gray-400">—</span>}</td>
-    </tr>)}</tbody></table></div>;
+      <td className={`${cell} whitespace-nowrap`}>{claim.hasPaymentProof?<button type="button" className="font-medium text-blue-600 hover:text-blue-800 hover:underline" title={claim.paymentProofName} onClick={()=>setProof(claim)}>View proof</button>:<span className="text-gray-400">—</span>}</td>
+    </tr>)}</tbody></table></div>
+    {proof&&<ClaimFileModal claim={proof} kind="proof" onClose={()=>setProof(null)}/>}
+  </>;
 }

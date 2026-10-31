@@ -9,8 +9,6 @@ export type ClaimFileKind='receipt'|'proof';
 const ALLOWED=/^data:(image\/jpeg|image\/png|application\/pdf);base64,/;
 type Loaded={state:'loading'}|{state:'error';message:string}|{state:'unsupported'}|{state:'ready';url:string;pdf:boolean};
 
-/** "PDF" or "Image", from the file name (the file itself loads only when it is opened). */
-export const fileLabel=(name:string)=>/\.pdf$/i.test(name)?'PDF':'Image';
 export const fileName=(claim:ExpenseClaim,kind:ClaimFileKind)=>kind==='receipt'?claim.receiptName:claim.paymentProofName;
 export const hasFile=(claim:ExpenseClaim,kind:ClaimFileKind)=>kind==='receipt'?claim.hasReceipt:claim.hasPaymentProof;
 

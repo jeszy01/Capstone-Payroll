@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
-import {Check,ChevronLeft,ChevronRight,FileText,Image as ImageIcon,MoreVertical,RotateCcw,ThumbsDown} from 'lucide-react';
+import {Check,ChevronLeft,ChevronRight,FileText,MoreVertical,RotateCcw,ThumbsDown} from 'lucide-react';
 import {Button,Card,Empty,ErrorAlert,Field,LoadingState,Modal,Segmented,ghost,input} from '../components/common/ui';
 import type {Employee} from '../types/domain';
 import {employeeService} from '../features/employees/employeeService';
@@ -11,7 +11,7 @@ import {employeeName,normalizeClaims,updateClaim} from '../features/claims/claim
 import {claimWarnings} from '../../backend-render/claimRules.js';
 import type {ClaimReview,ExpenseClaim} from '../features/claims/claimsTypes';
 import {ClaimStatusBadge,EmployeeCell,cell,claimDate,flushCard,rowHeader,tableHead} from '../features/claims/claimsUi';
-import {ClaimFileModal,fileLabel} from '../features/claims/ClaimFileViewer';
+import {ClaimFileModal} from '../features/claims/ClaimFileViewer';
 import type {ClaimFileKind} from '../features/claims/ClaimFileViewer';
 import {peso} from '../utils/storage';
 
@@ -92,7 +92,7 @@ function ClaimsTable({claims,employees,warningsOf,canDecide,own,onReject,onRetur
    <td className={`${cell} whitespace-nowrap text-gray-600`}>{claimDate(claim.date)}</td>
    <td className={`${cell} whitespace-nowrap text-right font-semibold tabular-nums text-gray-900`}>{peso(claim.amount)}</td>
    <td className={cell}><ClaimStatusBadge claim={claim}/>{claim.approvalStatus==='Returned'&&claim.notes&&<div className="mt-1 max-w-[220px] whitespace-normal text-[11px] text-amber-700">{claim.notes}</div>}{claim.paymentStatus==='Unpaid'&&warningsOf(claim).map(warning=><div key={warning} className="mt-1 max-w-[240px] whitespace-normal text-[11px] font-medium text-amber-700">⚠ {warning}</div>)}</td>
-   <td className={`${cell} whitespace-nowrap`}>{claim.hasReceipt?<button type="button" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800" title={claim.receiptName} aria-label={`View receipt ${claim.receiptName} for ${claim.claimNumber}`} onClick={()=>onReceipt(claim)}>{fileLabel(claim.receiptName)==='PDF'?<FileText size={15}/>:<ImageIcon size={15}/>}{fileLabel(claim.receiptName)}</button>:claim.receiptName?<span className="text-gray-600" title={claim.receiptName}>Attached</span>:<span className="font-medium text-red-700">Missing</span>}</td>
+   <td className={`${cell} whitespace-nowrap`}>{claim.hasReceipt?<button type="button" className="font-medium text-blue-600 underline-offset-2 hover:text-blue-800 hover:underline" title={claim.receiptName} aria-label={`View receipt ${claim.receiptName} for ${claim.claimNumber}`} onClick={()=>onReceipt(claim)}>View receipt</button>:claim.receiptName?<span className="text-gray-600" title={claim.receiptName}>Attached</span>:<span className="font-medium text-red-700">Missing</span>}</td>
    <td className={cell}><ClaimActions claim={claim} canDecide={isOpen(claim)&&canDecide&&!own.has(claim.employeeId)} onReject={onReject} onReturn={onReturn} onView={onView}/></td>
   </tr>)}</tbody></table></div>;
 }

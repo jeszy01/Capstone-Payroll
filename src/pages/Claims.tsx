@@ -11,7 +11,7 @@ import {employeeName,normalizeClaims,updateClaim} from '../features/claims/claim
 import {claimWarnings} from '../../backend-render/claimRules.js';
 import type {ClaimReview,ExpenseClaim} from '../features/claims/claimsTypes';
 import {ClaimStatusBadge,EmployeeCell,cell,claimDate,flushCard,rowHeader,tableHead} from '../features/claims/claimsUi';
-import {ClaimFileViewer,fileLabel} from '../features/claims/ClaimFileViewer';
+import {ClaimFileModal,fileLabel} from '../features/claims/ClaimFileViewer';
 import type {ClaimFileKind} from '../features/claims/ClaimFileViewer';
 import {peso} from '../utils/storage';
 
@@ -35,7 +35,7 @@ export default function Claims(){
  const[employees,setEmployees]=useState<Employee[]>([]);
  const[claims,setClaims]=useState<ExpenseClaim[]>([]);
  const[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('');
- const[review,setReview]=useState<Review|null>(null);
+ const[review,setReview]=useState<Review|null>(null),[file,setFile]=useState<{claim:ExpenseClaim;kind:ClaimFileKind}|null>(null);
  const[pending,setPending]=useState<Pending|null>(null),[reason,setReason]=useState(''),[saving,setSaving]=useState(false),[actionError,setActionError]=useState('');
  const canDecide=can('claims.approve');
  // The signed-in user's own claims (employee records with their email): another reviewer decides them.
@@ -68,11 +68,12 @@ export default function Claims(){
     <Segmented label="Filter claims by status" options={FILTERS} value={filter} onChange={setFilter} idPrefix="claims-filter" panelId="claims-list"/>
    </div>
    <section id="claims-list" role="tabpanel" aria-labelledby={`claims-filter-${filter}`} className="min-w-0">
-    {loading?<LoadingState>Loading claims…</LoadingState>:<ClaimsTable claims={list} employees={employees} warningsOf={claim=>claimWarnings(claim,claims)} canDecide={canDecide} own={own} onReject={claim=>openPending('reject',claim)} onReturn={claim=>openPending('return',claim)} onView={openReview}/>}
+    {loading?<LoadingState>Loading claims…</LoadingState>:<ClaimsTable claims={list} employees={employees} warningsOf={claim=>claimWarnings(claim,claims)} canDecide={canDecide} own={own} onReject={claim=>openPending('reject',claim)} onReturn={claim=>openPending('return',claim)} onView={openReview} onReceipt={claim=>setFile({claim,kind:'receipt'})}/>}
    </section>
   </Card>
   {review&&reviewed&&<ReviewModal key={reviewed.id} claim={reviewed} employees={employees} warnings={claimWarnings(reviewed,claims)} canDecide={canDecide&&!own.has(reviewed.employeeId)} ownClaim={own.has(reviewed.employeeId)}
-   queue={review.queue.filter(id=>claims.some(item=>item.id===id))} onNavigate={id=>setReview({...review,id})} onClose={()=>setReview(null)} onDecide={patch=>update(reviewed.id,patch)}/>}
+   queue={review.queue.filter(id=>claims.some(item=>item.id===id))} onNavigate={id=>setReview({...review,id})} onClose={()=>{if(!file)setReview(null)}} onFile={kind=>setFile({claim:reviewed,kind})} onDecide={patch=>update(reviewed.id,patch)}/>}
+  {file&&<ClaimFileModal claim={file.claim} kind={file.kind} onClose={()=>setFile(null)}/>}
   {pending&&<Modal title={pending.kind==='reject'?'Reject claim?':'Return claim for correction?'} onClose={()=>{if(!saving)setPending(null)}}>
    <p className="mb-3 mt-0 text-[13px] text-gray-600">{pending.kind==='reject'?`Reject claim ${pending.claim.claimNumber} for ${peso(pending.claim.amount)}? A rejected claim cannot be approved or reimbursed later.`:`Return claim ${pending.claim.claimNumber} to the employee? They correct it in ESS and resubmit it.`}</p>
    <Field label="Reason (shown to the employee in ESS)"><textarea className={`${input} min-h-24`} maxLength={500} autoFocus value={reason} onChange={event=>setReason(event.target.value)}/></Field>
@@ -81,7 +82,7 @@ export default function Claims(){
  </div>;
 }
 
-function ClaimsTable({claims,employees,warningsOf,canDecide,own,onReject,onReturn,onView}:{claims:ExpenseClaim[];employees:Employee[];warningsOf:(claim:ExpenseClaim)=>string[];canDecide:boolean;own:Set<string>;onReject:(claim:ExpenseClaim)=>void;onReturn:(claim:ExpenseClaim)=>void;onView:(claim:ExpenseClaim)=>void}){
+function ClaimsTable({claims,employees,warningsOf,canDecide,own,onReject,onReturn,onView,onReceipt}:{claims:ExpenseClaim[];employees:Employee[];warningsOf:(claim:ExpenseClaim)=>string[];canDecide:boolean;own:Set<string>;onReject:(claim:ExpenseClaim)=>void;onReturn:(claim:ExpenseClaim)=>void;onView:(claim:ExpenseClaim)=>void;onReceipt:(claim:ExpenseClaim)=>void}){
  return <div role="region" aria-label="Claims table" tabIndex={0} className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"><table className="w-full min-w-[900px] text-left text-[13px] [&_td]:!px-3 [&_th]:!px-3"><caption className="sr-only">Claims with claim number, employee, type, date, amount, status, receipt, and available actions. Open a claim to read its business purpose.</caption>
   <thead><tr className={tableHead}>{['Claim No.','Employee','Type','Date','Amount','Status','Receipt','Actions'].map(header=><th key={header} scope="col" className={`whitespace-nowrap px-4 py-3.5 ${header==='Amount'?'text-right':''}`}>{header}</th>)}</tr></thead>
   <tbody>{claims.length===0?<tr><td colSpan={8}><Empty>No claims with this status.</Empty></td></tr>:claims.map(claim=><tr key={claim.id} className="border-b border-gray-100 transition-colors hover:bg-blue-50/35">
@@ -91,7 +92,7 @@ function ClaimsTable({claims,employees,warningsOf,canDecide,own,onReject,onRetur
    <td className={`${cell} whitespace-nowrap text-gray-600`}>{claimDate(claim.date)}</td>
    <td className={`${cell} whitespace-nowrap text-right font-semibold tabular-nums text-gray-900`}>{peso(claim.amount)}</td>
    <td className={cell}><ClaimStatusBadge claim={claim}/>{claim.approvalStatus==='Returned'&&claim.notes&&<div className="mt-1 max-w-[220px] text-[11px] text-amber-700">{claim.notes}</div>}{claim.paymentStatus==='Unpaid'&&warningsOf(claim).map(warning=><div key={warning} className="mt-1 max-w-[240px] whitespace-normal text-[11px] font-medium text-amber-700">⚠ {warning}</div>)}</td>
-   <td className={`${cell} whitespace-nowrap`}>{claim.hasReceipt?<button type="button" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800" title={claim.receiptName} aria-label={`View receipt ${claim.receiptName} for ${claim.claimNumber}`} onClick={()=>onView(claim)}>{fileLabel(claim.receiptName)==='PDF'?<FileText size={15}/>:<ImageIcon size={15}/>}{fileLabel(claim.receiptName)}</button>:claim.receiptName?<span className="text-gray-600" title={claim.receiptName}>Attached</span>:<span className="font-medium text-red-700">Missing</span>}</td>
+   <td className={`${cell} whitespace-nowrap`}>{claim.hasReceipt?<button type="button" className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800" title={claim.receiptName} aria-label={`View receipt ${claim.receiptName} for ${claim.claimNumber}`} onClick={()=>onReceipt(claim)}>{fileLabel(claim.receiptName)==='PDF'?<FileText size={15}/>:<ImageIcon size={15}/>}{fileLabel(claim.receiptName)}</button>:claim.receiptName?<span className="text-gray-600" title={claim.receiptName}>Attached</span>:<span className="font-medium text-red-700">Missing</span>}</td>
    <td className={cell}><ClaimActions claim={claim} canDecide={isOpen(claim)&&canDecide&&!own.has(claim.employeeId)} onReject={onReject} onReturn={onReturn} onView={onView}/></td>
   </tr>)}</tbody></table></div>;
 }
@@ -124,26 +125,20 @@ function ClaimActions({claim,canDecide,onReject,onReturn,onView}:{claim:ExpenseC
 }
 
 function Detail({label,children}:{label:string;children:React.ReactNode}){return <div><dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt><dd className="m-0 mt-1 text-[13px] text-gray-800">{children}</dd></div>}
-/** A claim's receipt beside its details, with the decision for a claim to decide; Prev / Next move through the list. */
-function ReviewModal({claim,employees,warnings,canDecide,ownClaim,queue,onNavigate,onClose,onDecide}:{claim:ExpenseClaim;employees:Employee[];warnings:string[];canDecide:boolean;ownClaim:boolean;queue:string[];onNavigate:(id:string)=>void;onClose:()=>void;onDecide:(patch:ClaimReview)=>Promise<boolean>}){
- const[kind,setKind]=useState<ClaimFileKind>('receipt');
+/** A claim's details, with the decision for a claim to decide; Prev / Next move through the list. */
+function ReviewModal({claim,employees,warnings,canDecide,ownClaim,queue,onNavigate,onClose,onFile,onDecide}:{claim:ExpenseClaim;employees:Employee[];warnings:string[];canDecide:boolean;ownClaim:boolean;queue:string[];onNavigate:(id:string)=>void;onClose:()=>void;onFile:(kind:ClaimFileKind)=>void;onDecide:(patch:ClaimReview)=>Promise<boolean>}){
  const[mode,setMode]=useState<'return'|'reject'|null>(null),[reason,setReason]=useState(''),[saving,setSaving]=useState(false);
  const index=queue.indexOf(claim.id),previous=index>0?queue[index-1]:undefined,next=index>=0?queue[index+1]:undefined;
  const decide=async(patch:ClaimReview)=>{setSaving(true);const done=await onDecide(patch);setSaving(false);if(done){setMode(null);setReason('')}};
  const employee=employees.find(item=>item.id===claim.employeeId);
  const nav='inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent';
  const open=isOpen(claim),returned=claim.approvalStatus==='Returned';
- return <Modal title={`${claim.claimNumber} · ${employee?.name??employeeName(employees,claim.employeeId)}`} wide="full" stickyHeader onClose={()=>{if(!saving)onClose()}} actions={queue.length>1&&index>=0?<div className="mr-2 flex items-center gap-1">
+ return <Modal title={`${claim.claimNumber} · ${employee?.name??employeeName(employees,claim.employeeId)}`} wide stickyHeader onClose={()=>{if(!saving)onClose()}} actions={queue.length>1&&index>=0?<div className="mr-2 flex items-center gap-1">
    <button type="button" className={nav} disabled={!previous||saving} aria-label="Previous claim" onClick={()=>previous&&onNavigate(previous)}><ChevronLeft size={15}/><span className="hidden sm:inline">Prev</span></button>
    <span className="whitespace-nowrap text-[12px] tabular-nums text-gray-500">{index+1} of {queue.length}</span>
    <button type="button" className={nav} disabled={!next||saving} aria-label="Next claim" onClick={()=>next&&onNavigate(next)}><span className="hidden sm:inline">Next</span><ChevronRight size={15}/></button>
   </div>:undefined}>
-  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-   <div className="min-w-0 space-y-2">
-    {claim.hasPaymentProof&&<div className="flex gap-1">{(['receipt','proof'] as const).map(item=><button key={item} type="button" aria-pressed={kind===item} className={`rounded-lg px-3 py-1.5 text-[12px] font-medium ${kind===item?'bg-blue-50 text-blue-700':'text-gray-500 hover:bg-gray-100'}`} onClick={()=>setKind(item)}>{item==='receipt'?'Receipt':'Proof of Payment'}</button>)}</div>}
-    <ClaimFileViewer claim={claim} kind={kind} className="h-[45vh] lg:h-[62vh]"/>
-   </div>
-   <div className="min-w-0 space-y-4">
+  <div className="min-w-0 space-y-4">
     <ClaimStatusBadge claim={claim}/>
     {warnings.length>0&&claim.paymentStatus==='Unpaid'&&<div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900"><div className="font-semibold">Check before approving</div><ul className="mb-0 mt-1 list-disc pl-5">{warnings.map(warning=><li key={warning}>{warning}</li>)}</ul></div>}
     <dl className="m-0 grid grid-cols-2 gap-4">
@@ -153,7 +148,8 @@ function ReviewModal({claim,employees,warnings,canDecide,ownClaim,queue,onNaviga
      <Detail label="Amount"><span className="font-semibold tabular-nums">{peso(claim.amount)}</span></Detail>
      <Detail label="Submitted">{claim.source==='ESS'?`${claimDate(claim.createdAt.slice(0,10))} via ESS`:'Encoded in PBMS'}</Detail>
      {claim.decidedBy&&<Detail label="Decided By">{claim.decidedBy}</Detail>}
-     {claim.paymentStatus!=='Unpaid'&&<><Detail label="Payment Date">{claimDate(claim.paymentDate)}</Detail><Detail label="Paid By">{[claim.paymentMethod,claim.paymentReference&&`ref. ${claim.paymentReference}`].filter(Boolean).join(' · ')||'—'}</Detail><Detail label="Recorded By">{claim.paidBy||'—'}</Detail></>}
+     {claim.paymentStatus!=='Unpaid'&&<><Detail label="Payment Date">{claimDate(claim.paymentDate)}</Detail><Detail label="Paid By">{[claim.paymentMethod,claim.paymentReference&&`ref. ${claim.paymentReference}`].filter(Boolean).join(' · ')||'—'}</Detail><Detail label="Recorded By">{claim.paidBy||'—'}</Detail><Detail label="Proof of Payment">{claim.hasPaymentProof?<button type="button" className="font-medium text-blue-600 hover:underline" onClick={()=>onFile('proof')}>View proof</button>:'—'}</Detail></>}
+     <div className="col-span-2"><Detail label="Receipt">{claim.receiptName?<span className="flex flex-wrap items-center gap-2"><span className="break-all">{claim.receiptName}</span>{claim.hasReceipt&&<button type="button" className="font-medium text-blue-600 hover:underline" onClick={()=>onFile('receipt')}>View receipt</button>}</span>:<span className="font-medium text-red-700">Missing</span>}</Detail></div>
      <div className="col-span-2"><Detail label="Business Purpose"><p className="m-0 rounded-lg bg-gray-50 p-3 text-gray-600">{claim.businessPurpose||'—'}</p></Detail></div>
      {claim.notes&&<div className="col-span-2"><Detail label="Review Notes"><p className="m-0 rounded-lg bg-amber-50 p-3 text-amber-800">{claim.notes}</p></Detail></div>}
      <div className="col-span-2"><Detail label="Business Expense Certification">{claim.certified?'Confirmed — not a personal expense':'Not confirmed'}</Detail></div>
@@ -169,7 +165,6 @@ function ReviewModal({claim,employees,warnings,canDecide,ownClaim,queue,onNaviga
       {returned?<span className="ml-auto text-[12px] font-medium text-amber-700">Waiting for the employee</span>:<button type="button" className="ml-auto inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50" disabled={saving} onClick={()=>void decide({approvalStatus:'Approved',notes:''})}><Check size={15}/>{saving?'Saving…':'Approve'}</button>}
      </div>}
     </div>}
-   </div>
   </div>
  </Modal>;
 }

@@ -912,6 +912,9 @@ function EnrollmentViewModal({
       { key: "activate", label: "Confirm Enrollment", needs: "reference" as const, field: "Maxicare member ID / card no.", placeholder: "From Maxicare's confirmation email or card", run: (reference: string) => hmoService.activateEnrollment(enrollment.id, reference), audit: `Confirmed the HMO enrollment of ${name} with the member ID from Maxicare's confirmation.` },
       { key: "maxicare-reject", label: "Not Accepted by Maxicare", danger: true, needs: "reason" as const, field: "Reason given by Maxicare", run: (reason: string) => hmoService.recordEnrollmentMaxicareRejection(enrollment.id, reason), audit: `Entered that Maxicare did not accept the HMO enrollment of ${name}.` },
     ] : []),
+    ...(enrollment.maxicareStatus === "Active" ? [
+      { key: "correct", label: "Correct Member ID", needs: "correction" as const, field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "") => hmoService.correctEnrollmentMemberId(enrollment.id, reference, reason), audit: `Corrected the Maxicare member ID of ${name}.` },
+    ] : []),
     // A pending enrollment is rejected rather than terminated.
     ...(!pending && enrollment.approvalStatus === "Approved" && ["Pending", "Submitted", "Active"].includes(enrollment.status) ? [
       { key: "terminate", label: "Terminate", danger: true, confirm: `End ${name}'s HMO coverage? Their dependents can no longer be changed under this enrollment.`, run: () => hmoService.terminateEnrollment(enrollment.id), audit: `Terminated the HMO enrollment of ${name}.` },
@@ -1081,7 +1084,12 @@ function DependentViewModal({
   const pending = dependent.approvalStatus === "Pending" && ["Pending", "Submitted"].includes(dependent.status);
   const open = !["Terminated", "Rejected", "Expired"].includes(dependent.status);
   const name = dependent.name;
-  const steps: WorkflowStep[] = !coverageActive ? [] : [
+  // A confirmed member ID can be corrected even after the employee's coverage has ended.
+  const correction: WorkflowStep[] = dependent.maxicareStatus === "Active" ? [
+    { key: "correct", label: "Correct Member ID", needs: "correction", field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "") => hmoService.correctDependentMemberId(dependent.id, reference, reason), audit: `Corrected the Maxicare member ID of HMO dependent ${name}.` },
+  ] : [];
+  const steps: WorkflowStep[] = !coverageActive ? correction : [
+    ...correction,
     ...(pending ? [
       { key: "approve", label: "Approve Dependent", permission: "hmo.approve" as const, run: () => hmoService.approveDependent(dependent.id), audit: `Approved HMO dependent ${name}.` },
       { key: "reject", label: "Reject", danger: true, permission: "hmo.approve" as const, needs: "reason" as const, run: (reason: string) => hmoService.rejectDependent(dependent.id, reason), audit: `Rejected HMO dependent ${name}.` },
@@ -1123,20 +1131,22 @@ function DependentViewModal({
 }
 
 // Approve and Reject need hmo.approve (Admin); every other step needs hmo.manage (HR Staff).
-type WorkflowStep = { key: string; label: string; permission?: "hmo.approve" | "hmo.manage"; danger?: boolean; needs?: "reason" | "reference"; field?: string; placeholder?: string; confirm?: string; audit: string; run: (value: string) => Promise<unknown> };
+type WorkflowStep = { key: string; label: string; permission?: "hmo.approve" | "hmo.manage"; danger?: boolean; needs?: "reason" | "reference" | "correction"; field?: string; placeholder?: string; confirm?: string; audit: string; run: (value: string, reason?: string) => Promise<unknown> };
 /** Action buttons for an HMO record. Steps that need a reason, a Maxicare member ID or a confirmation open an inline
  * form first; the others run on click. Errors from the server stay visible in the dialog. */
 function WorkflowActions({ steps, onDone, onClose }: { steps: WorkflowStep[]; onDone: () => void; onClose: () => void }) {
   const [active, setActive] = useState<WorkflowStep | null>(null),
     [value, setValue] = useState(""),
+    [reason, setReason] = useState(""),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const incomplete = (step: WorkflowStep) => Boolean((step.needs && !value.trim()) || (step.needs === "correction" && !reason.trim()));
   const run = async (step: WorkflowStep) => {
-    if (step.needs && !value.trim()) return;
+    if (incomplete(step)) return;
     setSaving(true);
     setError("");
     try {
-      await step.run(value.trim());
+      await step.run(value.trim(), reason.trim());
       recordAudit({ action: step.label, module: "HMO & Benefits", description: step.audit });
       onDone();
     } catch (cause) {
@@ -1144,7 +1154,7 @@ function WorkflowActions({ steps, onDone, onClose }: { steps: WorkflowStep[]; on
       setSaving(false);
     }
   };
-  const open = (step: WorkflowStep) => { setError(""); setValue(""); if (step.needs || step.confirm) setActive(step); else void run(step); };
+  const open = (step: WorkflowStep) => { setError(""); setValue(""); setReason(""); if (step.needs || step.confirm) setActive(step); else void run(step); };
   const allowed = steps.filter((step) => can(step.permission ?? "hmo.manage"));
   const waitingForAdmin = !allowed.length && steps.some((step) => step.permission === "hmo.approve");
   return (
@@ -1153,11 +1163,12 @@ function WorkflowActions({ steps, onDone, onClose }: { steps: WorkflowStep[]; on
       {active ? (
         <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
           {active.needs === "reason" && <Field label={active.field ?? "Reason for rejection"}><textarea className={`${input} min-h-20`} maxLength={500} autoFocus value={value} onChange={(e) => setValue(e.target.value)} /></Field>}
-          {active.needs === "reference" && <Field label={active.field ?? "Maxicare member ID / card no."}><TextInput autoFocus maxLength={100} value={value} onChange={(e) => setValue(e.target.value)} placeholder={active.placeholder} /></Field>}
+          {(active.needs === "reference" || active.needs === "correction") && <Field label={active.field ?? "Maxicare member ID / card no."}><TextInput autoFocus maxLength={100} value={value} onChange={(e) => setValue(e.target.value)} placeholder={active.placeholder} /></Field>}
+          {active.needs === "correction" && <div className="mt-3"><Field label="Reason"><textarea className={`${input} min-h-20`} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} /></Field></div>}
           {active.confirm && <p className="m-0 text-[13px] text-gray-500">{active.confirm}</p>}
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button type="button" className={ghost} disabled={saving} onClick={() => setActive(null)}>Back</button>
-            <Button className={active.danger ? "!bg-red-600 hover:!bg-red-700" : ""} disabled={saving || Boolean(active.needs && !value.trim())} onClick={() => void run(active)}>{saving ? "Saving…" : active.label}</Button>
+            <Button className={active.danger ? "!bg-red-600 hover:!bg-red-700" : ""} disabled={saving || incomplete(active)} onClick={() => void run(active)}>{saving ? "Saving…" : active.label}</Button>
           </div>
         </div>
       ) : (

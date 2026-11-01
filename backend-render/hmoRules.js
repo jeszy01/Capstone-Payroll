@@ -100,6 +100,16 @@ export function hmoHistoryType(resource) {
 // Maxicare is not connected to PBMS. HR sends each approved request to Maxicare and enters Maxicare's answer; a request
 // with no answer after this many working days (Monday to Friday, not holidays) is flagged for HR to follow up.
 export const MAXICARE_FOLLOW_UP_WORKING_DAYS = 3;
+/** A member ID as compared for duplicates: capitals, spaces and dashes do not make a different ID. */
+const memberIdKey = value => String(value ?? '').toUpperCase().replace(/[\s-]/g, '');
+/**
+ * The member of another employee's family who already has this member ID, or null. members are rows with employee_id and
+ * maxicare_reference. An employee and their own dependents may share one, as Maxicare may link them to the employee's number.
+ */
+export function memberIdHolder(reference, employeeId, members) {
+  const key = memberIdKey(reference);
+  return members.find(member => memberIdKey(member.maxicare_reference) === key && String(member.employee_id) !== String(employeeId)) ?? null;
+}
 /** Working days after the day from (YYYY-MM-DD) through to, skipping weekends and the given holiday dates. */
 export function workingDaysBetween(from, to, holidays = []) {
   const skip = new Set(holidays);

@@ -15,7 +15,7 @@ import { RECEIPT_MAX_BYTES, checkReceipt, receiptFileName } from './fundingRecei
 import { claimantError, claimPaymentError, claimTotals, paymentProofError, essClaimFields, essClaimNotice, essClaimView, keepServerClaimFields, nextClaimNumber, paidClaim, receiptOf, stampClaimDecisions, withoutReceipt } from './claimRules.js';
 import { CORRECTION_STATUSES, correctionDecision, correctionFields, correctionView } from './correctionRules.js';
 import { GRADE_STRUCTURE_KEY, POSITION_GRADES_KEY, startingDailyRate } from './gradeStructure.js';
-import { dependentShares, hmoExpiryChanges, hmoHistoryType, manilaToday, maxicareFollowUpDue, MAXICARE_FOLLOW_UP_WORKING_DAYS, memberIdHolder, nextSponsoredDependent, validDependentSplit } from './hmoRules.js';
+import { dependentShares, hmoExpiryChanges, hmoHistoryType, manilaToday, maxicareFollowUpDue, MAXICARE_FOLLOW_UP_WORKING_DAYS, memberIdHolder, nextSponsoredDependent, submittedByUser, validDependentSplit } from './hmoRules.js';
 import { lockedRuleChange } from './withholdingRuleLock.js';
 import { BATCHES_KEY, batchPaymentError, cancelBatch, createBatch, newBatchError, payBatch } from './reimbursementRules.js';
 import { heldReply, transactions } from './transaction.js';
@@ -1796,9 +1796,16 @@ async function hmoHandler(req, res) {
     const previous = await first(table, { id: targetId });
     if (!previous) throw new HttpError(404, 'HMO_RECORD_NOT_FOUND', 'HMO record was not found.');
     const now = new Date().toISOString();
-    if (['approve', 'reject'].includes(action) && previous.submitted_by && String(previous.submitted_by) === String(ctx.userId))
+    if (['approve', 'reject'].includes(action) && submittedByUser(previous.submitted_by, ctx.userId))
       throw new HttpError(409, 'HMO_SELF_APPROVAL', 'A request must be approved or rejected by someone other than the person who submitted it.');
 
+    // Whoever added a request can cancel it while it is pending, so a request added by the only Admin never gets stuck:
+    // they cannot approve it themselves, and HR cannot approve at all. It closes as Rejected, so it can be added again.
+    if (['enrollments', 'dependents'].includes(resource) && action === 'cancel') {
+      if (String(previous.approval_status ?? 'Pending') !== 'Pending' || !['Pending', 'Submitted'].includes(String(previous.status ?? ''))) throw new HttpError(409, 'HMO_REQUEST_NOT_PENDING', 'Only a pending request can be cancelled.');
+      if (!submittedByUser(previous.submitted_by, ctx.userId)) throw new HttpError(403, 'HMO_NOT_SUBMITTER', 'Only the person who added this request can cancel it.');
+      return saveTransition('cancelled', targetId, previous, { approval_status: 'Rejected', status: 'Rejected', rejection_reason: 'Cancelled by the person who added it.', updated_at: now });
+    }
     const memberEmployeeId = async () => resource === 'enrollments' ? String(previous.employee_id) : String((await first('hmo_enrollments', { id: String(previous.enrollment_id) }))?.employee_id);
     // A member ID entered wrong is corrected here; the reason, who changed it and the old ID are kept in the history.
     if (['enrollments', 'dependents'].includes(resource) && action === 'correct_member_id') {

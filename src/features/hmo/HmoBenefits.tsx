@@ -29,7 +29,8 @@ import { localToday } from "../../components/common/tableUi";
 import { can } from "../auth/permissions";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { loadHolidays } from "../settings/payrollSettings";
-import { MAXICARE_FOLLOW_UP_WORKING_DAYS, manilaToday, maxicareFollowUpDue, workingDaysBetween } from "../../../backend-render/hmoRules.js";
+import { MAXICARE_FOLLOW_UP_WORKING_DAYS, manilaToday, maxicareFollowUpDue, submittedByUser, workingDaysBetween } from "../../../backend-render/hmoRules.js";
+import { getCurrentUser } from "../auth/authService";
 import type {
   HmoDependent,
   HmoEnrollment,
@@ -900,8 +901,12 @@ function EnrollmentViewModal({
 }) {
   const pending = enrollment.approvalStatus === "Pending" && ["Pending", "Submitted"].includes(enrollment.status);
   const name = employee?.name ?? "this employee";
+  const mine = pending && submittedByUser(enrollment.submittedBy, getCurrentUser()?.id);
   const steps: WorkflowStep[] = [
-    ...(pending ? [
+    ...(mine ? [
+      { key: "cancel", label: "Cancel Request", danger: true, confirm: `Cancel this request for ${name}? It can be added again.`, run: () => hmoService.cancelEnrollment(enrollment.id), audit: `Cancelled the HMO enrollment request of ${name}.` },
+    ] : []),
+    ...(pending && !mine ? [
       { key: "approve", label: "Approve Enrollment", permission: "hmo.approve" as const, run: () => hmoService.approveEnrollment(enrollment.id), audit: `Approved the HMO enrollment of ${name}.` },
       { key: "reject", label: "Reject", danger: true, permission: "hmo.approve" as const, needs: "reason" as const, run: (reason: string) => hmoService.rejectEnrollment(enrollment.id, reason), audit: `Rejected the HMO enrollment of ${name}.` },
     ] : []),
@@ -936,7 +941,7 @@ function EnrollmentViewModal({
         <MaxicareDetails request={enrollment} />
         {enrollment.rejectionReason && enrollment.maxicareStatus !== "Rejected" && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700"><div className="text-[11px] font-semibold uppercase tracking-wide">Rejection Reason</div><div className="mt-1">{enrollment.rejectionReason}</div></div>}
       </div>
-      <WorkflowActions steps={steps} onDone={onChanged} onClose={onClose} />
+      <WorkflowActions steps={steps} waiting={mine ? ownRequestWaiting() : undefined} onDone={onChanged} onClose={onClose} />
     </Modal>
   );
 }
@@ -1088,9 +1093,14 @@ function DependentViewModal({
   const correction: WorkflowStep[] = dependent.maxicareStatus === "Active" ? [
     { key: "correct", label: "Correct Member ID", needs: "correction", field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "") => hmoService.correctDependentMemberId(dependent.id, reference, reason), audit: `Corrected the Maxicare member ID of HMO dependent ${name}.` },
   ] : [];
-  const steps: WorkflowStep[] = !coverageActive ? correction : [
+  const mine = pending && submittedByUser(dependent.submittedBy, getCurrentUser()?.id);
+  const cancel: WorkflowStep[] = mine ? [
+    { key: "cancel", label: "Cancel Request", danger: true, confirm: `Cancel this request for ${name}? It can be added again.`, run: () => hmoService.cancelDependent(dependent.id), audit: `Cancelled the HMO dependent request of ${name}.` },
+  ] : [];
+  const steps: WorkflowStep[] = !coverageActive ? [...correction, ...cancel] : [
     ...correction,
-    ...(pending ? [
+    ...cancel,
+    ...(pending && !mine ? [
       { key: "approve", label: "Approve Dependent", permission: "hmo.approve" as const, run: () => hmoService.approveDependent(dependent.id), audit: `Approved HMO dependent ${name}.` },
       { key: "reject", label: "Reject", danger: true, permission: "hmo.approve" as const, needs: "reason" as const, run: (reason: string) => hmoService.rejectDependent(dependent.id, reason), audit: `Rejected HMO dependent ${name}.` },
     ] : []),
@@ -1125,16 +1135,18 @@ function DependentViewModal({
         {dependent.rejectionReason && dependent.maxicareStatus !== "Rejected" && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700"><div className="text-[11px] font-semibold uppercase tracking-wide">Rejection Reason</div><div className="mt-1">{dependent.rejectionReason}</div></div>}
         {!coverageActive && open && <p className="m-0 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800">The employee must be Enrolled (approved and confirmed with Maxicare's member ID) before this dependent can be reviewed.</p>}
       </div>
-      <WorkflowActions steps={steps} onDone={onChanged} onClose={onClose} />
+      <WorkflowActions steps={steps} waiting={mine ? ownRequestWaiting() : undefined} onDone={onChanged} onClose={onClose} />
     </Modal>
   );
 }
 
+/** Shown on a request the signed-in user added: another person has to decide it. */
+const ownRequestWaiting = () => can("hmo.approve") ? "Waiting for another Admin to approve this request." : "Waiting for an Admin to approve this request.";
 // Approve and Reject need hmo.approve (Admin); every other step needs hmo.manage (HR Staff).
 type WorkflowStep = { key: string; label: string; permission?: "hmo.approve" | "hmo.manage"; danger?: boolean; needs?: "reason" | "reference" | "correction"; field?: string; placeholder?: string; confirm?: string; audit: string; run: (value: string, reason?: string) => Promise<unknown> };
 /** Action buttons for an HMO record. Steps that need a reason, a Maxicare member ID or a confirmation open an inline
  * form first; the others run on click. Errors from the server stay visible in the dialog. */
-function WorkflowActions({ steps, onDone, onClose }: { steps: WorkflowStep[]; onDone: () => void; onClose: () => void }) {
+function WorkflowActions({ steps, waiting, onDone, onClose }: { steps: WorkflowStep[]; waiting?: string; onDone: () => void; onClose: () => void }) {
   const [active, setActive] = useState<WorkflowStep | null>(null),
     [value, setValue] = useState(""),
     [reason, setReason] = useState(""),
@@ -1173,7 +1185,7 @@ function WorkflowActions({ steps, onDone, onClose }: { steps: WorkflowStep[]; on
         </div>
       ) : (
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-          {waitingForAdmin && <p className="m-0 mr-auto text-[12px] text-gray-500">Waiting for an Admin to approve or reject this request.</p>}
+          {(waiting || waitingForAdmin) && <p className="m-0 mr-auto text-[12px] text-gray-500">{waiting ?? "Waiting for an Admin to approve or reject this request."}</p>}
           {allowed.map((step) => step.danger
             ? <button key={step.key} type="button" className={`${ghost} border-red-200 text-red-700 hover:bg-red-50`} disabled={saving} onClick={() => open(step)}>{step.label}</button>
             : <Button key={step.key} disabled={saving} onClick={() => open(step)}>{saving ? "Saving…" : step.label}</Button>)}

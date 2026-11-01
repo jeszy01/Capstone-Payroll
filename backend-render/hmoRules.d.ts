@@ -11,6 +11,7 @@ export function nextSponsoredDependent<T extends Row>(dependents:T[]):T|null;
 export const HMO_HISTORY_TYPES:string[];
 export function hmoHistoryType(resource:string):'provider'|'plan'|'enrollment'|'dependent';
 export const MAXICARE_FOLLOW_UP_WORKING_DAYS:number;
+export function submittedByUser(submittedBy:unknown,userId:unknown):boolean;
 export function memberIdHolder<T extends Row>(reference:string,employeeId:string,members:T[]):T|null;
 export function workingDaysBetween(from:string,to:string,holidays?:string[]):number;
 export function maxicareFollowUpDue(maxicareStatus:string|undefined,submittedAt:string|null|undefined,today:string,holidays?:string[]):boolean;

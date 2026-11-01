@@ -100,6 +100,8 @@ export function hmoHistoryType(resource) {
 // Maxicare is not connected to PBMS. HR sends each approved request to Maxicare and enters Maxicare's answer; a request
 // with no answer after this many working days (Monday to Friday, not holidays) is flagged for HR to follow up.
 export const MAXICARE_FOLLOW_UP_WORKING_DAYS = 3;
+/** Whether this user added the request: they cannot approve or reject it, but they can cancel it while it is pending. */
+export const submittedByUser = (submittedBy, userId) => Boolean(submittedBy && userId && String(submittedBy) === String(userId));
 /** A member ID as compared for duplicates: capitals, spaces and dashes do not make a different ID. */
 const memberIdKey = value => String(value ?? '').toUpperCase().replace(/[\s-]/g, '');
 /**

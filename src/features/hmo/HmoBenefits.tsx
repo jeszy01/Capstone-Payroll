@@ -29,7 +29,7 @@ import { localToday } from "../../components/common/tableUi";
 import { can } from "../auth/permissions";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { loadHolidays } from "../settings/payrollSettings";
-import { MAXICARE_FOLLOW_UP_WORKING_DAYS, manilaToday, maxicareFollowUpDue, submittedByUser, workingDaysBetween } from "../../../backend-render/hmoRules.js";
+import { MAXICARE_FOLLOW_UP_WORKING_DAYS, manilaToday, maxicareFollowUpDue, memberIdCheck, submittedByUser, workingDaysBetween } from "../../../backend-render/hmoRules.js";
 import { getCurrentUser } from "../auth/authService";
 import type {
   HmoDependent,
@@ -914,11 +914,11 @@ function EnrollmentViewModal({
       { key: "submit", label: enrollment.maxicareStatus === "Rejected" ? "Mark as Sent Again" : "Mark as Sent to Maxicare", confirm: `Mark ${name}'s request as sent to Maxicare? Send it to Maxicare first (email or Maxicare portal); PBMS does not send it.`, run: () => hmoService.submitEnrollmentToMaxicare(enrollment.id), audit: `Marked the HMO enrollment of ${name} as sent to Maxicare.` },
     ] : []),
     ...(enrollment.approvalStatus === "Approved" && enrollment.maxicareStatus === "Pending" && ["Pending", "Submitted"].includes(enrollment.status) ? [
-      { key: "activate", label: "Confirm Enrollment", needs: "reference" as const, field: "Maxicare member ID / card no.", placeholder: "From Maxicare's confirmation email or card", run: (reference: string) => hmoService.activateEnrollment(enrollment.id, reference), audit: `Confirmed the HMO enrollment of ${name} with the member ID from Maxicare's confirmation.` },
+      { key: "activate", label: "Confirm Enrollment", needs: "reference" as const, memberCheck: { employeeId: enrollment.employeeId, recordId: enrollment.id }, field: "Maxicare member ID / card no.", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, _reason?: string, allowShared?: boolean) => hmoService.activateEnrollment(enrollment.id, reference, allowShared), audit: `Confirmed the HMO enrollment of ${name} with the member ID from Maxicare's confirmation.` },
       { key: "maxicare-reject", label: "Not Accepted by Maxicare", danger: true, needs: "reason" as const, field: "Reason given by Maxicare", run: (reason: string) => hmoService.recordEnrollmentMaxicareRejection(enrollment.id, reason), audit: `Entered that Maxicare did not accept the HMO enrollment of ${name}.` },
     ] : []),
     ...(enrollment.maxicareStatus === "Active" ? [
-      { key: "correct", label: "Correct Member ID", needs: "correction" as const, field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "") => hmoService.correctEnrollmentMemberId(enrollment.id, reference, reason), audit: `Corrected the Maxicare member ID of ${name}.` },
+      { key: "correct", label: "Correct Member ID", needs: "correction" as const, memberCheck: { employeeId: enrollment.employeeId, recordId: enrollment.id }, field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "", allowShared?: boolean) => hmoService.correctEnrollmentMemberId(enrollment.id, reference, reason, allowShared), audit: `Corrected the Maxicare member ID of ${name}.` },
     ] : []),
     // A pending enrollment is rejected rather than terminated.
     ...(!pending && enrollment.approvalStatus === "Approved" && ["Pending", "Submitted", "Active"].includes(enrollment.status) ? [
@@ -1090,8 +1090,9 @@ function DependentViewModal({
   const open = !["Terminated", "Rejected", "Expired"].includes(dependent.status);
   const name = dependent.name;
   // A confirmed member ID can be corrected even after the employee's coverage has ended.
+  const memberCheck = enrollment ? { employeeId: enrollment.employeeId, recordId: dependent.id } : undefined;
   const correction: WorkflowStep[] = dependent.maxicareStatus === "Active" ? [
-    { key: "correct", label: "Correct Member ID", needs: "correction", field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "") => hmoService.correctDependentMemberId(dependent.id, reference, reason), audit: `Corrected the Maxicare member ID of HMO dependent ${name}.` },
+    { key: "correct", label: "Correct Member ID", needs: "correction", memberCheck, field: "Correct member ID", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, reason = "", allowShared?: boolean) => hmoService.correctDependentMemberId(dependent.id, reference, reason, allowShared), audit: `Corrected the Maxicare member ID of HMO dependent ${name}.` },
   ] : [];
   const mine = pending && submittedByUser(dependent.submittedBy, getCurrentUser()?.id);
   const cancel: WorkflowStep[] = mine ? [
@@ -1108,7 +1109,7 @@ function DependentViewModal({
       { key: "submit", label: dependent.maxicareStatus === "Rejected" ? "Mark as Sent Again" : "Mark as Sent to Maxicare", confirm: `Mark ${name}'s request as sent to Maxicare? Send it to Maxicare first (email or Maxicare portal); PBMS does not send it.`, run: () => hmoService.submitDependentToMaxicare(dependent.id), audit: `Marked HMO dependent ${name} as sent to Maxicare.` },
     ] : []),
     ...(open && dependent.approvalStatus === "Approved" && dependent.maxicareStatus === "Pending" && dependent.status !== "Active" ? [
-      { key: "activate", label: "Confirm Enrollment", needs: "reference" as const, field: "Maxicare member ID / card no.", placeholder: "From Maxicare's confirmation email or card", run: (reference: string) => hmoService.activateDependent(dependent.id, reference), audit: `Confirmed HMO dependent ${name} with the member ID from Maxicare's confirmation.` },
+      { key: "activate", label: "Confirm Enrollment", needs: "reference" as const, memberCheck, field: "Maxicare member ID / card no.", placeholder: "From Maxicare's confirmation email or card", run: (reference: string, _reason?: string, allowShared?: boolean) => hmoService.activateDependent(dependent.id, reference, allowShared), audit: `Confirmed HMO dependent ${name} with the member ID from Maxicare's confirmation.` },
       { key: "maxicare-reject", label: "Not Accepted by Maxicare", danger: true, needs: "reason" as const, field: "Reason given by Maxicare", run: (reason: string) => hmoService.recordDependentMaxicareRejection(dependent.id, reason), audit: `Entered that Maxicare did not accept HMO dependent ${name}.` },
     ] : []),
     // A pending dependent is rejected rather than terminated.
@@ -1143,7 +1144,16 @@ function DependentViewModal({
 /** Shown on a request the signed-in user added: another person has to decide it. */
 const ownRequestWaiting = () => can("hmo.approve") ? "Waiting for another Admin to approve this request." : "Waiting for an Admin to approve this request.";
 // Approve and Reject need hmo.approve (Admin); every other step needs hmo.manage (HR Staff).
-type WorkflowStep = { key: string; label: string; permission?: "hmo.approve" | "hmo.manage"; danger?: boolean; needs?: "reason" | "reference" | "correction"; field?: string; placeholder?: string; confirm?: string; audit: string; run: (value: string, reason?: string) => Promise<unknown> };
+type WorkflowStep = { key: string; label: string; permission?: "hmo.approve" | "hmo.manage"; danger?: boolean; needs?: "reason" | "reference" | "correction"; memberCheck?: { employeeId: string; recordId: string }; field?: string; placeholder?: string; confirm?: string; audit: string; run: (value: string, reason?: string, allowShared?: boolean) => Promise<unknown> };
+/** Everyone with a saved Maxicare member ID, to check an ID while it is typed. The server checks again when it is saved. */
+async function loadMemberIds() {
+  const [enrollments, dependents, employees] = await Promise.all([hmoService.enrollments(), hmoService.dependents(), employeeService.getAll()]);
+  const employeeOf = new Map(enrollments.map((item) => [item.id, item.employeeId]));
+  return [
+    ...enrollments.filter((item) => item.maxicareReference).map((item) => ({ id: item.id, employee_id: item.employeeId, maxicare_reference: item.maxicareReference, name: employees.find((employee) => employee.id === item.employeeId)?.name ?? "another employee" })),
+    ...dependents.filter((item) => item.maxicareReference).map((item) => ({ id: item.id, employee_id: employeeOf.get(item.enrollmentId) ?? "", maxicare_reference: item.maxicareReference, name: item.name })),
+  ];
+}
 /** Action buttons for an HMO record. Steps that need a reason, a Maxicare member ID or a confirmation open an inline
  * form first; the others run on click. Errors from the server stay visible in the dialog. */
 function WorkflowActions({ steps, waiting, onDone, onClose }: { steps: WorkflowStep[]; waiting?: string; onDone: () => void; onClose: () => void }) {
@@ -1151,19 +1161,31 @@ function WorkflowActions({ steps, waiting, onDone, onClose }: { steps: WorkflowS
     [value, setValue] = useState(""),
     [reason, setReason] = useState(""),
     [saving, setSaving] = useState(false),
-    [error, setError] = useState("");
-  const incomplete = (step: WorkflowStep) => Boolean((step.needs && !value.trim()) || (step.needs === "correction" && !reason.trim()));
+    [error, setError] = useState(""),
+    [members, setMembers] = useState<Awaited<ReturnType<typeof loadMemberIds>>>([]),
+    [reload, setReload] = useState(0);
+  const checking = active?.memberCheck;
+  useEffect(() => {
+    if (!checking) return;
+    let current = true;
+    loadMemberIds().then((rows) => { if (current) setMembers(rows); }).catch(() => undefined);
+    return () => { current = false; };
+  }, [checking?.recordId, reload]);
+  const check = checking ? memberIdCheck(value.trim(), checking.employeeId, checking.recordId, members) : { other: null, family: null };
+  const incomplete = (step: WorkflowStep) => Boolean((step.needs && !value.trim()) || (step.needs === "correction" && !reason.trim()) || check.other);
   const run = async (step: WorkflowStep) => {
     if (incomplete(step)) return;
     setSaving(true);
     setError("");
     try {
-      await step.run(value.trim(), reason.trim());
+      await step.run(value.trim(), reason.trim(), Boolean(check.family));
       recordAudit({ action: step.label, module: "HMO & Benefits", description: step.audit });
       onDone();
     } catch (cause) {
       setError(cause instanceof Error && cause.message ? cause.message : "The HMO record could not be updated.");
       setSaving(false);
+      // Someone may have saved this member ID meanwhile: the message under the field catches up.
+      setReload((count) => count + 1);
     }
   };
   const open = (step: WorkflowStep) => { setError(""); setValue(""); setReason(""); if (step.needs || step.confirm) setActive(step); else void run(step); };
@@ -1175,12 +1197,14 @@ function WorkflowActions({ steps, waiting, onDone, onClose }: { steps: WorkflowS
       {active ? (
         <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
           {active.needs === "reason" && <Field label={active.field ?? "Reason for rejection"}><textarea className={`${input} min-h-20`} maxLength={500} autoFocus value={value} onChange={(e) => setValue(e.target.value)} /></Field>}
-          {(active.needs === "reference" || active.needs === "correction") && <Field label={active.field ?? "Maxicare member ID / card no."}><TextInput autoFocus maxLength={100} value={value} onChange={(e) => setValue(e.target.value)} placeholder={active.placeholder} /></Field>}
+          {(active.needs === "reference" || active.needs === "correction") && <Field label={active.field ?? "Maxicare member ID / card no."}><TextInput autoFocus maxLength={100} value={value} onChange={(e) => { setValue(e.target.value); setError(""); }} placeholder={active.placeholder} /></Field>}
+          {check.other && <p role="alert" className="mb-0 mt-2 rounded-lg bg-red-50 p-3 text-[13px] text-red-700">This member ID is already saved for {check.other.name}. Check it against Maxicare's confirmation.</p>}
+          {!check.other && check.family && <p role="status" className="mb-0 mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-800">This member ID is already saved for {check.family.name}, in the same family. Save it only if Maxicare confirmed they share it.</p>}
           {active.needs === "correction" && <div className="mt-3"><Field label="Reason"><textarea className={`${input} min-h-20`} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} /></Field></div>}
           {active.confirm && <p className="m-0 text-[13px] text-gray-500">{active.confirm}</p>}
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button type="button" className={ghost} disabled={saving} onClick={() => setActive(null)}>Back</button>
-            <Button className={active.danger ? "!bg-red-600 hover:!bg-red-700" : ""} disabled={saving || incomplete(active)} onClick={() => void run(active)}>{saving ? "Saving…" : active.label}</Button>
+            <Button className={active.danger ? "!bg-red-600 hover:!bg-red-700" : ""} disabled={saving || incomplete(active)} onClick={() => void run(active)}>{saving ? "Saving…" : check.family ? "Save Anyway" : active.label}</Button>
           </div>
         </div>
       ) : (

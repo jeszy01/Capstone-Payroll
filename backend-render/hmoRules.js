@@ -105,12 +105,17 @@ export const submittedByUser = (submittedBy, userId) => Boolean(submittedBy && u
 /** A member ID as compared for duplicates: capitals, spaces and dashes do not make a different ID. */
 const memberIdKey = value => String(value ?? '').toUpperCase().replace(/[\s-]/g, '');
 /**
- * The member of another employee's family who already has this member ID, or null. members are rows with employee_id and
- * maxicare_reference. An employee and their own dependents may share one, as Maxicare may link them to the employee's number.
+ * Who already has this member ID, leaving out the record being saved. other: someone in another employee's family, which
+ * is refused. family: the same employee or their dependent, saved only after HR confirms it, as Maxicare may link a
+ * family to one number. members are rows with id, employee_id and maxicare_reference.
  */
-export function memberIdHolder(reference, employeeId, members) {
+export function memberIdCheck(reference, employeeId, recordId, members) {
   const key = memberIdKey(reference);
-  return members.find(member => memberIdKey(member.maxicare_reference) === key && String(member.employee_id) !== String(employeeId)) ?? null;
+  const same = key ? members.filter(member => String(member.id) !== String(recordId) && memberIdKey(member.maxicare_reference) === key) : [];
+  return {
+    other: same.find(member => String(member.employee_id) !== String(employeeId)) ?? null,
+    family: same.find(member => String(member.employee_id) === String(employeeId)) ?? null,
+  };
 }
 /** Working days after the day from (YYYY-MM-DD) through to, skipping weekends and the given holiday dates. */
 export function workingDaysBetween(from, to, holidays = []) {

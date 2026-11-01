@@ -15,7 +15,7 @@ import { RECEIPT_MAX_BYTES, checkReceipt, receiptFileName } from './fundingRecei
 import { claimantError, claimPaymentError, claimTotals, paymentProofError, essClaimFields, essClaimNotice, essClaimView, keepServerClaimFields, nextClaimNumber, paidClaim, receiptOf, stampClaimDecisions, withoutReceipt } from './claimRules.js';
 import { CORRECTION_STATUSES, correctionDecision, correctionFields, correctionView } from './correctionRules.js';
 import { GRADE_STRUCTURE_KEY, POSITION_GRADES_KEY, startingDailyRate } from './gradeStructure.js';
-import { dependentShares, hmoExpiryChanges, hmoHistoryType, manilaToday, maxicareFollowUpDue, MAXICARE_FOLLOW_UP_WORKING_DAYS, memberIdHolder, nextSponsoredDependent, submittedByUser, validDependentSplit } from './hmoRules.js';
+import { dependentShares, hmoExpiryChanges, hmoHistoryType, manilaToday, maxicareFollowUpDue, MAXICARE_FOLLOW_UP_WORKING_DAYS, memberIdCheck, nextSponsoredDependent, submittedByUser, validDependentSplit } from './hmoRules.js';
 import { lockedRuleChange } from './withholdingRuleLock.js';
 import { BATCHES_KEY, batchPaymentError, cancelBatch, createBatch, newBatchError, payBatch } from './reimbursementRules.js';
 import { heldReply, transactions } from './transaction.js';
@@ -1631,18 +1631,18 @@ async function hmoHistory(entityType, entityId, action, actorId, previous, next)
   await insertRow('hmo_history', { entity_type: entityType, entity_id: entityId, action, actor_id: actorId ?? null, previous_values: previousValues, new_values: nextValues, created_at: new Date().toISOString() });
   await audit(`hmo.${entityType}.${action}`, actorId, `hmo_${entityType}`, entityId, { previous: previousValues, next: nextValues });
 }
-// Refuses a Maxicare member ID already saved for another employee or their dependents. The lock makes two confirmations
-// at the same moment wait for each other, so both cannot save the same ID.
-async function ensureMemberIdFree(reference, employeeId) {
+// Refuses a Maxicare member ID already saved for another employee or their dependents; one saved within the same family
+// needs allowShared. The lock makes two confirmations at the same moment wait for each other, so both cannot save it.
+async function ensureMemberIdFree(reference, employeeId, recordId, allowShared) {
   await run(`select pg_advisory_xact_lock(hashtext('hmo.maxicare_reference'))`);
   const [enrollments, dependents] = await Promise.all([
-    run('select employee_id, maxicare_reference from hmo_enrollments where maxicare_reference is not null'),
-    run('select d.name, e.employee_id, d.maxicare_reference from hmo_dependents d join hmo_enrollments e on e.id = d.enrollment_id where d.maxicare_reference is not null'),
+    run('select id, employee_id, maxicare_reference from hmo_enrollments where maxicare_reference is not null'),
+    run('select d.id, d.name, e.employee_id, d.maxicare_reference from hmo_dependents d join hmo_enrollments e on e.id = d.enrollment_id where d.maxicare_reference is not null'),
   ]);
-  const holder = memberIdHolder(reference, employeeId, [...enrollments.rows, ...dependents.rows]);
-  if (!holder) return;
-  const employee = holder.name ? null : await first('employees', { id: String(holder.employee_id) });
-  throw new HttpError(409, 'MAXICARE_REFERENCE_IN_USE', `This member ID is already saved for ${holder.name ?? (employee ? employeeName(employee) : 'another employee')}. Check it against Maxicare's confirmation.`);
+  const { other, family } = memberIdCheck(reference, employeeId, recordId, [...enrollments.rows, ...dependents.rows]);
+  const holderName = async holder => { if (holder.name) return holder.name; const employee = await first('employees', { id: String(holder.employee_id) }); return employee ? employeeName(employee) : 'another employee'; };
+  if (other) throw new HttpError(409, 'MAXICARE_REFERENCE_IN_USE', `This member ID is already saved for ${await holderName(other)}. Check it against Maxicare's confirmation.`);
+  if (family && !allowShared) throw new HttpError(409, 'MAXICARE_REFERENCE_SHARED', `This member ID is already saved for ${await holderName(family)}, in the same family. Save it only if Maxicare confirmed they share it.`);
 }
 const ensureMaxicare = async providerId => {
   const provider = await first('hmo_providers', { id: providerId });
@@ -1813,7 +1813,7 @@ async function hmoHandler(req, res) {
       const reference = text(b.maxicare_reference), reason = required(b.reason, 'reason');
       if (!reference) throw new HttpError(400, 'MAXICARE_REFERENCE_REQUIRED', 'Enter the correct Maxicare member ID or card number.');
       if (reference === text(previous.maxicare_reference)) throw new HttpError(400, 'MAXICARE_REFERENCE_UNCHANGED', 'This is already the saved member ID.');
-      await ensureMemberIdFree(reference, await memberEmployeeId());
+      await ensureMemberIdFree(reference, await memberEmployeeId(), targetId, b.allow_shared === true);
       await updateRows(table, { id: targetId }, { maxicare_reference: reference, updated_at: now });
       const updated = await first(table, { id: targetId }) ?? { ...previous, maxicare_reference: reference, updated_at: now };
       await hmoHistory(hmoHistoryType(resource), targetId, 'member_id_corrected', ctx.userId, previous, { ...updated, correction_reason: reason });
@@ -1850,7 +1850,7 @@ async function hmoHandler(req, res) {
         if (previous.maxicare_status !== 'Pending') throw new HttpError(409, 'MAXICARE_SUBMISSION_REQUIRED', 'Mark the approved enrollment as sent to Maxicare before confirming it.');
         const reference = text(b.maxicare_reference);
         if (!reference) throw new HttpError(400, 'MAXICARE_REFERENCE_REQUIRED', 'Enter the Maxicare member ID or card number from Maxicare\'s confirmation.');
-        await ensureMemberIdFree(reference, await memberEmployeeId());
+        await ensureMemberIdFree(reference, await memberEmployeeId(), targetId, b.allow_shared === true);
         const effective = hmoDate(previous.effective_date, 'effective_date');
         const { employee, hireDate, eligibilityDate } = await ensureEmployeeEligibility(String(previous.employee_id), effective);
         ensureActivePlanCoverage(await ensurePlan(String(previous.plan_id)), effective, previous.expiration_date ? hmoDate(previous.expiration_date, 'expiration_date') : null);
@@ -1899,7 +1899,7 @@ async function hmoHandler(req, res) {
         if (status === 'Active') throw new HttpError(409, 'HMO_DEPENDENT_ALREADY_ACTIVE', 'This dependent is already active.');
         const reference = text(b.maxicare_reference);
         if (!reference) throw new HttpError(400, 'MAXICARE_REFERENCE_REQUIRED', 'Enter the Maxicare member ID or card number from Maxicare\'s confirmation.');
-        await ensureMemberIdFree(reference, await memberEmployeeId());
+        await ensureMemberIdFree(reference, await memberEmployeeId(), targetId, b.allow_shared === true);
         return saveTransition('enrollment_confirmed', targetId, previous, { status: 'Active', maxicare_status: 'Active', maxicare_reference: reference, maxicare_activated_at: now, maxicare_answered_by: ctx.userId ?? null, maxicare_answered_at: now, updated_at: now });
       }
       if (status !== 'Active' && status !== 'Submitted') throw new HttpError(409, 'HMO_DEPENDENT_ALREADY_CLOSED', 'Only an open dependent enrollment can be terminated.');

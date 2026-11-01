@@ -122,8 +122,8 @@ export const hmoService={
  rejectEnrollment:(id:string,rejection_reason:string)=>patch('enrollments',id,{action:'reject',rejection_reason}),
  submitEnrollmentToMaxicare:(id:string)=>patch('enrollments',id,{action:'submit_to_maxicare'}),
  recordEnrollmentMaxicareRejection:(id:string,rejection_reason:string)=>patch('enrollments',id,{action:'maxicare_reject',rejection_reason}),
- activateEnrollment:(id:string,maxicare_reference:string)=>patch('enrollments',id,{action:'activate',maxicare_reference}),
- correctEnrollmentMemberId:(id:string,maxicare_reference:string,reason:string)=>patch('enrollments',id,{action:'correct_member_id',maxicare_reference,reason}),
+ activateEnrollment:(id:string,maxicare_reference:string,allow_shared=false)=>patch('enrollments',id,{action:'activate',maxicare_reference,allow_shared}),
+ correctEnrollmentMemberId:(id:string,maxicare_reference:string,reason:string,allow_shared=false)=>patch('enrollments',id,{action:'correct_member_id',maxicare_reference,reason,allow_shared}),
  cancelEnrollment:(id:string)=>patch('enrollments',id,{action:'cancel'}),
  terminateEnrollment:(id:string)=>patch('enrollments',id,{action:'terminate'}),
 
@@ -131,8 +131,8 @@ export const hmoService={
  rejectDependent:(id:string,rejection_reason:string)=>patch('dependents',id,{action:'reject',rejection_reason}),
  submitDependentToMaxicare:(id:string)=>patch('dependents',id,{action:'submit_to_maxicare'}),
  recordDependentMaxicareRejection:(id:string,rejection_reason:string)=>patch('dependents',id,{action:'maxicare_reject',rejection_reason}),
- activateDependent:(id:string,maxicare_reference:string)=>patch('dependents',id,{action:'activate',maxicare_reference}),
- correctDependentMemberId:(id:string,maxicare_reference:string,reason:string)=>patch('dependents',id,{action:'correct_member_id',maxicare_reference,reason}),
+ activateDependent:(id:string,maxicare_reference:string,allow_shared=false)=>patch('dependents',id,{action:'activate',maxicare_reference,allow_shared}),
+ correctDependentMemberId:(id:string,maxicare_reference:string,reason:string,allow_shared=false)=>patch('dependents',id,{action:'correct_member_id',maxicare_reference,reason,allow_shared}),
  cancelDependent:(id:string)=>patch('dependents',id,{action:'cancel'}),
  terminateDependent:(id:string)=>patch('dependents',id,{action:'terminate'}),
 

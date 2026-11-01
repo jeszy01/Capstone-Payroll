@@ -32,5 +32,7 @@ export function hmoCutoffLines({plans,enrollments,dependents,from,to,payPeriodsP
   return [{employeeId:item.employeeId,enrollmentId:item.id,planName:plan.name,monthlyShare,cutoffDeduction:round(monthlyShare/periods),companyCutoffShare:round(calculateCompanyHmoShare(plan,covered)/periods),status:item.status}];
  });
 }
+/** The lines with an amount to deduct from the employee this cutoff (Deductions → HMO lists only these). */
+export const hmoLinesToDeduct=(lines:HmoCutoffLine[])=>lines.filter(line=>line.cutoffDeduction>0);
 export const hmoCutoffDeduction=(lines:HmoCutoffLine[],employeeId:string)=>round(lines.filter(line=>line.employeeId===employeeId).reduce((sum,line)=>sum+line.cutoffDeduction,0));
 export const hmoCompanyCutoffShare=(lines:HmoCutoffLine[],employeeId:string)=>round(lines.filter(line=>line.employeeId===employeeId).reduce((sum,line)=>sum+line.companyCutoffShare,0));

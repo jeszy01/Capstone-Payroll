@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {formatDate,formatDateRange} from '../utils/date';
-import {hmoCutoffDeduction,hmoCutoffLines} from '../features/hmo/hmoPayroll';
+import {hmoCutoffDeduction,hmoCutoffLines,hmoLinesToDeduct} from '../features/hmo/hmoPayroll';
 import type {HmoDependent,HmoEnrollment,HmoPlan} from '../features/hmo/hmoTypes';
 
 const plan:HmoPlan={id:'p1',providerId:'m',name:'Maxicare Gold',coverageStart:'2026-01-01',coverageEnd:'2026-12-31',annualBenefitLimit:null,inpatient:true,outpatient:true,emergency:true,preventiveCare:true,dental:false,employeeCompanyShare:100,employeeMemberShare:0,dependentCompanyShare:0,dependentMemberShare:100,employeeMonthlyPremium:1500,dependentMonthlyPremium:900,collectEmployeeShareViaPayroll:true,status:'Active'};
@@ -37,5 +37,12 @@ describe('HMO cutoff deductions',()=>{
  it('leaves out company-sponsored and not-yet-effective dependents',()=>{
   expect(lines([enrollment()],[dependent({companySponsored:true,employeeShare:0})])[0].cutoffDeduction).toBe(0);
   expect(lines([enrollment()],[dependent({effectiveDate:'2026-11-01'})])[0].monthlyShare).toBe(0);
+ });
+ it('lists only the employees with an amount to deduct',()=>{
+  const zero=lines([enrollment()],[dependent({companySponsored:true,employeeShare:0})]);
+  expect(zero).toHaveLength(1);
+  expect(hmoLinesToDeduct(zero)).toEqual([]);
+  const deducted=[{...zero[0],cutoffDeduction:250}];
+  expect(hmoLinesToDeduct(deducted)).toEqual(deducted);
  });
 });

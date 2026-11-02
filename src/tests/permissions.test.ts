@@ -10,7 +10,7 @@ describe('role permissions',()=>{
   expect(can('hmo.approve','Admin')).toBe(true);
   expect(can('hmo.approve','HR Staff')).toBe(false);
  });
- it('lets HR Staff generate, approve (the Finance page, for the demo), fund and release payroll, handle claims and view Logs & Audits, but not change settings',()=>{
+ it('lets HR Staff generate, approve, fund and release payroll, handle claims and view Logs & Audits, but not change settings',()=>{
   for(const permission of ['payroll.generate','payroll.release','payroll.approve','payroll.fund','claims.encode','claims.approve','claims.pay','attendance.encode','employees.manage','compensation.manage','hmo.manage','audit.view'] as const)expect(can(permission,'HR Staff')).toBe(true);
   for(const permission of ['compensation.approve','users.manage','settings.edit'] as const)expect(can(permission,'HR Staff')).toBe(false);
  });

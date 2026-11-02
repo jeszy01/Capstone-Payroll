@@ -18,7 +18,6 @@ const routePermissions:Array<[string,Permission]>=[
  ['/privacy/users','users.manage'],
  ['/privacy/privacy','settings.view'],
  ['/privacy/backup','settings.view'],
- ['/finance','payroll.fund'],
  ['/payroll-settings','settings.view'],
  ['/payroll','payroll.view'],
  ['/time-attendance','attendance.view'],

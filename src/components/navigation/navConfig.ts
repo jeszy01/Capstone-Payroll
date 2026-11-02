@@ -27,7 +27,6 @@ export const titles={
  '/privacy/privacy':'Privacy',
  '/privacy/backup':'Data & Backup',
  '/logs-audits':'Audit Logs',
- '/finance':'Finance',
  '/payroll-settings':'Payroll Settings',
  '/hr-analytics':'HR Analytics',
  '/reports':'Reports',

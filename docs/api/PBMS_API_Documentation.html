@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PBMS API Documentation</title>
+<style>
+:root{--ink:#1c2430;--muted:#5b6675;--line:#d9dfe7;--soft:#f4f6f9;--accent:#1d4e89}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:900px;padding:32px 20px;font:14px/1.5 "Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff}
+h1{font-size:34px;line-height:1.15;margin:0 0 8px;color:var(--accent)}
+h2{font-size:21px;margin:34px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--accent);color:var(--accent)}
+h3{font-size:15.5px;margin:22px 0 8px}
+h4{font-size:12px;margin:12px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+p{margin:6px 0 10px}a{color:var(--accent);text-decoration:none}
+code,pre,.path{font-family:Consolas,"Courier New",monospace}
+code{font-size:.92em;background:var(--soft);padding:0 3px;border-radius:3px;overflow-wrap:break-word}
+pre{font-size:11.5px;line-height:1.4;background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:9px 11px;margin:4px 0 10px;white-space:pre-wrap;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12.5px}
+th{text-align:left;background:var(--soft);font-weight:600}
+th,td{border:1px solid var(--line);padding:5px 7px;vertical-align:top;overflow-wrap:break-word}
+tr{break-inside:avoid}thead{display:table-header-group}
+.matrix td:not(:first-child),.matrix th:not(:first-child){text-align:center;width:13%}
+.idx td{border-width:0 0 1px}.c-m{width:62px}.c-p{width:40%;font-family:Consolas,"Courier New",monospace;font-size:11.5px}
+.ep{margin:14px 0 18px;padding-top:10px;border-top:1px solid var(--line)}
+.ep-head{display:flex;gap:8px;align-items:center;break-after:avoid}
+.path{font-weight:700;font-size:13.5px;overflow-wrap:anywhere}
+.ep-sum{margin:5px 0 1px;font-weight:500;break-after:avoid}.ep-auth{font-size:12.5px;color:var(--muted);margin-bottom:5px}
+.m{display:inline-block;min-width:52px;text-align:center;font:700 10.5px/1.7 "Segoe UI",Arial,sans-serif;color:#fff;border-radius:3px;padding:0 5px}
+.m-get{background:#1f7a4d}.m-post{background:#1d4e89}.m-put{background:#8a5a00}.m-patch{background:#6b4c9a}.m-delete{background:#a8322a}
+.cover{padding:60px 0 24px}.cover .sub{font-size:17px;color:var(--muted);margin:0 0 22px}
+.meta{font-size:13px;color:var(--muted)}.toc{columns:2;padding-left:20px;margin:8px 0}.toc li{margin:2px 0}
+.note{background:var(--soft);border-left:3px solid var(--accent);padding:7px 11px;margin:8px 0}
+h2,h3,h4{break-after:avoid}
+@page{size:A4;margin:18mm 15mm 17mm;@bottom-center{content:"PBMS API Documentation  ·  Page " counter(page) " of " counter(pages);font:9px "Segoe UI",Arial,sans-serif;color:#5b6675}}
+@page:first{@bottom-center{content:none}}
+@media print{body{max-width:none;padding:0;font-size:12.5px}.cover{break-after:page}section#overview h2{margin-top:0}}
+</style></head><body>
+<div class="cover"><h1>PBMS API Documentation</h1><p class="sub">Payroll &amp; Benefits backend: app endpoints and the HR2, Finance and ESS integrations</p>
+<p class="meta">Generated from the backend source at commit 1741ae0 · November 5, 2026 · 68 endpoints</p>
+<h3>Contents</h3><ol class="toc"><li><a href="#overview">Overview</a></li><li><a href="#auth">Authentication</a></li><li><a href="#roles">Roles and permissions</a></li><li><a href="#index">Endpoint index</a></li><li><a href="#account">Sign-in and account</a></li><li><a href="#users">User accounts</a></li><li><a href="#employees">Employees</a></li><li><a href="#dashboard">Dashboard and audit log</a></li><li><a href="#appdata">Synchronized app data</a></li><li><a href="#payroll">Payroll runs</a></li><li><a href="#compensation">Compensation</a></li><li><a href="#hmo">HMO benefits</a></li><li><a href="#loans">Loans</a></li><li><a href="#claims">Claims and reimbursement</a></li><li><a href="#hr2">Integration: HR2 attendance</a></li><li><a href="#finance">Integration: Finance</a></li><li><a href="#ess">Integration: ESS</a></li><li><a href="#ops">Health checks and configuration</a></li></ol></div>
+<section id="overview"><h2>1. Overview</h2><p>PBMS (Payroll &amp; Benefits) is an Express 5 and PostgreSQL service in <code>backend-render/</code>. The React app calls it, and the HR2, Finance and ESS systems connect to it server to server.</p><table class=""><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Base URL</td><td><code>https://&lt;pbms-render-host&gt;</code> (the frontend reads it from <code>VITE_API_BASE</code>). Paths have no version prefix.</td></tr><tr><td>Format</td><td>JSON (<code>Content-Type: application/json</code>), UTF-8, unless an endpoint says otherwise.</td></tr><tr><td>Request size</td><td>JSON bodies up to 5 MB. Funding receipts are raw file bodies up to 5 MB.</td></tr><tr><td>Dates</td><td><code>YYYY-MM-DD</code>. Timestamps are ISO 8601 in UTC. "Today" for claims and HMO rules means Philippine time (Asia/Manila).</td></tr><tr><td>Money</td><td>Philippine pesos as numbers, rounded to 2 decimals.</td></tr><tr><td>CORS</td><td><code>http://localhost:5173</code> and the origins listed in <code>ALLOWED_ORIGINS</code>.</td></tr><tr><td>List size</td><td>Most lists that read through the shared row helper (users, compensation, HMO, loans) stop at 1,000 rows and have no paging. <code>GET /hmo/history</code> has paging; <code>GET /audit-logs</code> returns the latest 2,000 logged entries plus older browser-recorded activity.</td></tr></tbody></table><h3>Response format</h3><p>A successful response wraps its result in <code>data</code>. A failed response has <code>error</code> with a stable <code>code</code> and a readable <code>message</code>. <code>204 No Content</code> has no body. Exceptions: <code>GET /health</code> and <code>GET /api/health</code> have no wrapper, and funding receipts return the file itself.</p><pre>// Success
+{ "data": { "id": "c386ed75-..." } }
+
+// Failure
+{ "error": { "code": "VALIDATION_ERROR", "message": "employee_no is required." } }</pre><h3>Errors common to every endpoint</h3><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td>A required field is missing or invalid. The message names it.</td></tr><tr><td>400 / 409</td><td><code>INVALID_REQUEST</code></td><td>The database refused the values (invalid format, missing required column, duplicate or broken reference). 409 for duplicates and references. Applies to the routes under <code>/app-data</code>, <code>/employees</code>, <code>/audit-logs</code>, <code>/account</code>, <code>/payroll</code>, <code>/users</code>, <code>/compensation</code>, <code>/hmo</code>, <code>/loans</code>, <code>/government-loans</code> and <code>/integrations</code>.</td></tr><tr><td>401</td><td><code>INVALID_SESSION</code></td><td>The bearer token is missing, invalid or expired, its session was revoked, or the user is inactive.</td></tr><tr><td>401</td><td><code>INVALID_API_KEY</code></td><td>The <code>X-API-Key</code> header is missing or wrong (integration routes).</td></tr><tr><td>403</td><td><code>FORBIDDEN</code></td><td>The role lacks the permission, or a business rule refused the change.</td></tr><tr><td>413</td><td><code>RECEIPT_TOO_LARGE</code> / <code>FILE_TOO_LARGE</code></td><td>The body is over its limit. <code>RECEIPT_TOO_LARGE</code> on the route groups listed above, <code>FILE_TOO_LARGE</code> on all others.</td></tr><tr><td>500</td><td><code>INTERNAL_ERROR</code></td><td>An unexpected server error. A body that is not valid JSON also returns this.</td></tr></tbody></table></section>
+<section id="auth"><h2>2. Authentication</h2><h3>App users: bearer token</h3><p><code>POST /auth-login</code> returns a JWT valid for 8 hours. Send it on every app request. Each sign-in creates a session, listed in <code>GET /account</code>; signing out or revoking the session ends the token at once.</p><pre>Authorization: Bearer &lt;token&gt;</pre><h3>Integrations: API key</h3><p>HR2, Finance and ESS each have their own shared key, sent server to server. A key must be at least 32 characters; until it is set, that integration returns <code>503</code>. Generate one with <code>openssl rand -hex 32</code>, and never put a key in browser code.</p><pre>X-API-Key: &lt;shared key&gt;</pre><table class=""><thead><tr><th>System</th><th>Environment variable</th><th>Routes</th><th>Not configured</th></tr></thead><tbody><tr><td>HR2</td><td><code>HR2_API_KEY</code></td><td><code>/integrations/hr2/*</code></td><td><code>HR2_NOT_CONFIGURED</code></td></tr><tr><td>Finance</td><td><code>FINANCE_API_KEY</code></td><td><code>/integrations/finance/*</code></td><td><code>FINANCE_NOT_CONFIGURED</code></td></tr><tr><td>ESS</td><td><code>ESS_API_KEY</code></td><td><code>/integrations/ess/*</code></td><td><code>ESS_NOT_CONFIGURED</code></td></tr></tbody></table><h3>Passkey: confirming sensitive actions</h3><p>Each user sets their own passkey in Settings. Generating and releasing payslips send it in the request; CSV exports and Payroll Settings changes confirm it first with <code>verify_passkey</code> on <code>POST /account</code>. It is 6 to 64 characters and must differ from the login password. Five wrong entries lock it for 15 minutes.</p><p>A wrong passkey on a payslip endpoint still returns <code>200</code>, with a <code>false</code> flag and a reason: <code>not_set</code>, <code>invalid</code> or <code>locked</code> (with <code>locked_until</code>). Check the flag, not only the status.</p></section>
+<section id="roles"><h2>3. Roles and permissions</h2><p>Endpoints require a permission from <code>backend-render/permissions.json</code>, the same map the frontend uses for its route guards. Role values are <code>admin</code>, <code>hr_staff</code> and <code>finance</code>.</p><table class="matrix"><thead><tr><th>Permission</th><th>Admin</th><th>HR Staff</th><th>Finance</th></tr></thead><tbody><tr><td><code>attendance.encode</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>attendance.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>audit.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>claims.approve</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>claims.encode</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>claims.pay</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>claims.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>compensation.approve</code></td><td>Yes</td><td>—</td><td>—</td></tr><tr><td><code>compensation.manage</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>compensation.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>dashboard.view</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td><code>deductions.manage</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>deductions.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>employees.manage</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>employees.sensitive.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>employees.view</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td><code>hmo.approve</code></td><td>Yes</td><td>—</td><td>—</td></tr><tr><td><code>hmo.manage</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>hmo.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>leave.approve</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>leave.encode</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>leave.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>loans.manage</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>payroll.approve</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td><code>payroll.fund</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td><code>payroll.generate</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>payroll.release</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>payroll.view</code></td><td>Yes</td><td>Yes</td><td>Yes</td></tr><tr><td><code>settings.edit</code></td><td>Yes</td><td>—</td><td>—</td></tr><tr><td><code>settings.view</code></td><td>Yes</td><td>Yes</td><td>—</td></tr><tr><td><code>users.manage</code></td><td>Yes</td><td>—</td><td>—</td></tr></tbody></table><p>Some rules apply on top of permissions: nobody approves a payroll run they prepared, a salary change or bonus they entered, or an HMO request they submitted. Nobody decides or pays their own claim (matched by email to their employee record), and whoever approved a claim cannot record its payment.</p></section>
+<section id="index"><h2>4. Endpoint index</h2><p>All 68 endpoints, by module. Select a path to go to its details.</p><h3>Sign-in and account</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-1">/auth-login</a></td><td>Signs in and returns a token.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-2">/current-user</a></td><td>The signed-in user.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-3">/account</a></td><td>The account overview for Settings &gt; Security.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-4">/account</a></td><td>Runs an account action, chosen by <code>action</code>.</td></tr></tbody></table><h3>User accounts</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-5">/users</a></td><td>Lists user accounts.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-6">/users</a></td><td>Creates, updates or deletes an account. With no <code>action</code> it creates one.</td></tr></tbody></table><h3>Employees</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-7">/employees</a></td><td>Lists all employees, ordered by employee number.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-8">/employees</a></td><td>Creates an employee and assigns the salary for their position when one exists.</td></tr><tr><td class="c-m"><span class="m m-put">PUT</span></td><td class="c-p"><a href="#ep-9">/employees/{id}</a></td><td>Replaces an employee record.</td></tr><tr><td class="c-m"><span class="m m-delete">DELETE</span></td><td class="c-p"><a href="#ep-10">/employees/{id}</a></td><td>Deletes an employee and their HMO records. Returns <code>204</code>.</td></tr></tbody></table><h3>Dashboard and audit log</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-11">/dashboard</a></td><td>Pending approvals and employee figures for the signed-in role.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-12">/audit-logs</a></td><td>Logs &amp; Audit entries, newest first.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-13">/audit-logs</a></td><td>Records activity the app reports, such as an export.</td></tr></tbody></table><h3>Synchronized app data</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-14">/app-data</a></td><td>Reads the keys the signed-in role may read.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-15">/app-data</a></td><td>Saves one key.</td></tr><tr><td class="c-m"><span class="m m-delete">DELETE</span></td><td class="c-p"><a href="#ep-16">/app-data</a></td><td>Deletes one key. Returns <code>204</code>.</td></tr></tbody></table><h3>Payroll runs</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-17">/payroll/runs/{id}/register</a></td><td>The Payroll Register of a run, built from its saved figures.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-18">/payroll/runs/{id}/funding</a></td><td>Confirms the payroll account is funded; the run becomes Funded.</td></tr><tr><td class="c-m"><span class="m m-put">PUT</span></td><td class="c-p"><a href="#ep-19">/payroll/runs/{id}/funding/receipt</a></td><td>Attaches or replaces the receipt while the run is Funded.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-20">/payroll/runs/{id}/funding/receipt</a></td><td>Returns the receipt file itself, never cached.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-21">/payroll/payslips/generate</a></td><td>Generates the payslips of a Paid run.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-22">/payroll/payslips/release</a></td><td>Releases payslips to ESS by department.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-23">/payroll/runs/{id}/ess-release</a></td><td>Releases every unreleased payslip of a Paid or Closed run to ESS.</td></tr><tr><td class="c-m"><span class="m m-delete">DELETE</span></td><td class="c-p"><a href="#ep-24">/payroll/runs/{id}</a></td><td>Deletes a run in any status, including approved and paid ones.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-25">/payroll/corrections</a></td><td>Lists all corrections, newest first.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-26">/payroll/corrections/{id}</a></td><td>Decides or completes a correction.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-27">/attendance/hr2/sync</a></td><td>Reads the attendance HR2 has sent so far and logs the check.</td></tr></tbody></table><h3>Compensation</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-28">/compensation</a></td><td>Everything the Compensation pages show.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-29">/compensation</a></td><td>Runs a compensation action, chosen by <code>action</code>.</td></tr></tbody></table><h3>HMO benefits</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-30">/hmo/{resource}</a></td><td>Lists the records of a resource.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-31">/hmo/{resource}/{id}</a></td><td>Same as the list: the id is ignored on reads, so filter the result yourself.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-32">/hmo/{resource}</a></td><td>Creates a record, or runs an action when the body has <code>action</code>.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-33">/hmo/{resource}/{id}</a></td><td>Runs an action on the record in the path.</td></tr><tr><td class="c-m"><span class="m m-patch">PATCH</span></td><td class="c-p"><a href="#ep-34">/hmo/{resource}/{id}</a></td><td>Runs an action, or updates a provider. <code>PUT</code> behaves the same.</td></tr><tr><td class="c-m"><span class="m m-put">PUT</span></td><td class="c-p"><a href="#ep-35">/hmo/{resource}/{id}</a></td><td>Same as <code>PATCH</code>.</td></tr><tr><td class="c-m"><span class="m m-delete">DELETE</span></td><td class="c-p"><a href="#ep-36">/hmo/{resource}/{id}</a></td><td>Always refused: <code>409 HMO_DELETE_NOT_ALLOWED</code>.</td></tr></tbody></table><h3>Loans</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-37">/loans</a></td><td>All loan records and their transactions.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-38">/loans/schedule</a></td><td>Repayments due in a cutoff.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-39">/loans</a></td><td>Records a cash advance as Pending. Returns <code>201</code>.</td></tr><tr><td class="c-m"><span class="m m-patch">PATCH</span></td><td class="c-p"><a href="#ep-40">/loans/{id}</a></td><td>Approves or rejects a Pending record.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-41">/loans/settle</a></td><td>Posts the repayments of a Paid run once.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-42">/government-loans</a></td><td>All government loans and their deduction transactions.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-43">/government-loans/schedule</a></td><td>Active loans payroll may deduct in a cutoff.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-44">/government-loans/{id}/notice</a></td><td>The attached agency notice.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-45">/government-loans</a></td><td>Encodes a loan as Pending. Returns <code>201</code>.</td></tr><tr><td class="c-m"><span class="m m-patch">PATCH</span></td><td class="c-p"><a href="#ep-46">/government-loans/{id}</a></td><td>Edits, verifies or rejects a Pending loan.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-47">/government-loans/settle</a></td><td>Posts the deductions of a Paid run once; a loan reaching zero closes.</td></tr></tbody></table><h3>Claims and reimbursement</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-48">/claims/totals</a></td><td>Claim totals by month, type and status, with no employee or receipt details.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-49">/claims/{id}/receipt</a></td><td>A claim's receipt file.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-50">/claims/{id}/payment-proof</a></td><td>A claim's proof of payment, or its batch's proof.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-51">/claims/{id}/payment</a></td><td>Records the reimbursement of one approved claim.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-52">/claims/batches</a></td><td>Creates a batch of approved claims paid by one bank transfer. Returns <code>201</code>.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-53">/claims/batches/{id}/payment</a></td><td>Marks a batch paid after the bank transfer.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-54">/claims/batches/{id}/cancel</a></td><td>Cancels an unpaid batch; its claims return to the queue.</td></tr></tbody></table><h3>Integration: HR2 attendance</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-55">/integrations/hr2/attendance</a></td><td>Receives attendance records.</td></tr></tbody></table><h3>Integration: Finance</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-56">/integrations/finance/payroll-runs</a></td><td>Lists submitted runs, newest first.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-57">/integrations/finance/payroll-runs/{id}</a></td><td>One run with its employees.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-58">/integrations/finance/payroll-runs/{id}/funding-receipt</a></td><td>The funding receipt file (JPG, PNG or PDF).</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-59">/integrations/finance/payroll-runs/{id}/decision</a></td><td>Removed: always returns <code>410 DECISIONS_IN_PBMS</code>.</td></tr></tbody></table><h3>Integration: ESS</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-60">/integrations/ess/claims</a></td><td>Submits a claim. Returns <code>201</code>, or <code>200</code> for a repeated <code>ess_reference</code>.</td></tr><tr><td class="c-m"><span class="m m-put">PUT</span></td><td class="c-p"><a href="#ep-61">/integrations/ess/claims/{claimNumber}</a></td><td>Resubmits a Returned claim, with all fields again. It goes back to Pending Approval.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-62">/integrations/ess/claims</a></td><td>An employee's claims, newest first.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-63">/integrations/ess/payslips</a></td><td>An employee's released payslips, newest release first.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-64">/integrations/ess/notifications</a></td><td>An employee's latest 100 notifications, newest first.</td></tr><tr><td class="c-m"><span class="m m-post">POST</span></td><td class="c-p"><a href="#ep-65">/integrations/ess/corrections</a></td><td>Requests a payroll correction. Returns <code>201</code>, or <code>200</code> for a repeated <code>ess_reference</code>.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-66">/integrations/ess/corrections</a></td><td>An employee's corrections, newest first.</td></tr></tbody></table><h3>Health checks and configuration</h3><table class="idx"><tbody><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-67">/health</a></td><td>Confirms the service is running.</td></tr><tr><td class="c-m"><span class="m m-get">GET</span></td><td class="c-p"><a href="#ep-68">/api/health</a></td><td>Row counts, to check which database the service reads.</td></tr></tbody></table></section>
+<section id="account"><h2>5. Sign-in and account</h2><div class="ep" id="ep-1"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/auth-login</span></div><div class="ep-sum">Signs in and returns a token.</div><div class="ep-auth"><b>Access:</b> Public</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>email</code></td><td>Yes</td><td>Not case-sensitive.</td></tr><tr><td><code>password</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": {
+    "token": "&lt;jwt&gt;",
+    "user": {
+      "id": "uuid",
+      "employeeId": "USR-0001",
+      "name": "Maria Santos",
+      "displayName": "Maria",
+      "role": "HR Staff"
+    }
+  }
+}</pre><p><code>user.role</code> here is the label: <code>Admin</code>, <code>HR Staff</code> or <code>Finance</code>.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>401</td><td><code>INVALID_CREDENTIALS</code></td><td>Wrong email or password, or an inactive account.</td></tr></tbody></table></div><div class="ep" id="ep-2"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/current-user</span></div><div class="ep-sum">The signed-in user.</div><div class="ep-auth"><b>Access:</b> Bearer</div><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Maria Santos",
+      "display_name": "Maria",
+      "email": "maria@example.com",
+      "employee_id": "USR-0001",
+      "role": "hr_staff"
+    }
+  ]
+}</pre><p><code>data</code> is a list with one item.</p></div><div class="ep" id="ep-3"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/account</span></div><div class="ep-sum">The account overview for Settings &gt; Security.</div><div class="ep-auth"><b>Access:</b> Bearer</div><h4>Response</h4><pre>{
+  "data": {
+    "otp_enabled": true,
+    "otp_available": false,
+    "passkey_set": true,
+    "passkey_locked_until": null,
+    "current_session_id": "uuid",
+    "sessions": [
+      {
+        "id": "uuid",
+        "device": "Windows PC",
+        "browser": "Edge",
+        "created_at": "2026-11-05T01:00:00.000Z",
+        "last_active_at": "2026-11-05T01:20:00.000Z",
+        "current": true
+      }
+    ],
+    "history": [
+      {
+        "id": "uuid",
+        "device": "Windows PC",
+        "browser": "Edge",
+        "created_at": "2026-11-05T01:00:00.000Z",
+        "last_active_at": "2026-11-05T01:20:00.000Z",
+        "ended_at": null,
+        "status": "Active",
+        "current": true
+      }
+    ]
+  }
+}</pre><p><code>history</code> holds the latest 100 sign-ins; <code>status</code> is <code>Active</code>, <code>Signed out</code> or <code>Expired</code>. OTP is turned off on this server, so <code>otp_available</code> is always <code>false</code>.</p></div><div class="ep" id="ep-4"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/account</span></div><div class="ep-sum">Runs an account action, chosen by <code>action</code>.</div><div class="ep-auth"><b>Access:</b> Bearer (own account only)</div><p>Actions marked "password" also need <code>current_password</code>; a wrong one returns <code>400 INVALID_PASSWORD</code>. Actions that return "overview" reply with the same object as <code>GET /account</code>.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>UNKNOWN_ACTION</code></td><td>The action is not supported.</td></tr><tr><td>404</td><td><code>USER_NOT_FOUND</code></td><td>The account no longer exists.</td></tr></tbody></table></div><table class=""><thead><tr><th>action</th><th>Fields</th><th>Returns</th><th>Specific errors</th></tr></thead><tbody><tr><td><code>sign_out</code></td><td>—</td><td><code>{ signed_out: true }</code></td><td>—</td></tr><tr><td><code>set_display_name</code></td><td><code>display_name</code> (up to 80 characters)</td><td><code>{ display_name }</code></td><td>—</td></tr><tr><td><code>verify_passkey</code></td><td><code>purpose</code> (<code>export</code>, <code>release</code> or <code>settings</code>), <code>passkey</code>, <code>detail</code> (optional)</td><td><code>{ verified, reason?, locked_until?, attempts_left? }</code></td><td><code>INVALID_PURPOSE</code></td></tr><tr><td><code>change_passkey</code></td><td><code>current_passkey</code>, <code>new_passkey</code></td><td>overview</td><td><code>INVALID_PASSKEY</code>, <code>PASSKEY_NOT_SET</code> (409), <code>PASSKEY_LOCKED</code> (423), <code>PASSKEY_UNCHANGED</code>, <code>WEAK_PASSKEY</code>, <code>PASSKEY_MATCHES_PASSWORD</code></td></tr><tr><td><code>set_passkey</code></td><td>password, <code>new_passkey</code></td><td>overview</td><td><code>PASSKEY_ALREADY_SET</code> (409), <code>WEAK_PASSKEY</code>, <code>PASSKEY_MATCHES_PASSWORD</code></td></tr><tr><td><code>reset_passkey</code></td><td>password, <code>new_passkey</code></td><td>overview</td><td><code>WEAK_PASSKEY</code>, <code>PASSKEY_MATCHES_PASSWORD</code></td></tr><tr><td><code>change_password</code></td><td>password, <code>new_password</code></td><td>overview; signs out other sessions</td><td><code>WEAK_PASSWORD</code>, <code>PASSWORD_UNCHANGED</code></td></tr><tr><td><code>set_otp</code></td><td>password, <code>enabled</code> (boolean)</td><td>overview</td><td><code>INVALID_OTP_SETTING</code></td></tr><tr><td><code>revoke_session</code></td><td>password, <code>session_id</code></td><td>overview</td><td><code>CURRENT_SESSION</code>, <code>SESSION_NOT_FOUND</code> (404)</td></tr><tr><td><code>revoke_other_sessions</code></td><td>password</td><td>overview</td><td>—</td></tr></tbody></table><p>A new password needs 8 to 128 characters with upper-case and lower-case letters, a number and a symbol.</p></section>
+<section id="users"><h2>6. User accounts</h2><div class="ep" id="ep-5"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/users</span></div><div class="ep-sum">Lists user accounts.</div><div class="ep-auth"><b>Access:</b> <code>users.manage</code></div><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "uuid",
+      "employee_id": "USR-0001",
+      "name": "Maria Santos",
+      "display_name": "Maria",
+      "email": "maria@example.com",
+      "role": "hr_staff",
+      "status": "active"
+    }
+  ]
+}</pre></div><div class="ep" id="ep-6"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/users</span></div><div class="ep-sum">Creates, updates or deletes an account. With no <code>action</code> it creates one.</div><div class="ep-auth"><b>Access:</b> <code>users.manage</code></div><p>Account IDs (<code>USR-0001</code>, ...) are assigned by the server. Every change is written to Logs &amp; Audit.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_EMAIL</code>, <code>WEAK_PASSWORD</code>, <code>INVALID_ROLE</code>, <code>INVALID_STATUS</code></td><td>A field is invalid.</td></tr><tr><td>400</td><td><code>CANNOT_DEACTIVATE_SELF</code>, <code>CANNOT_DELETE_SELF</code></td><td>A user cannot do this to their own account.</td></tr><tr><td>404</td><td><code>USER_NOT_FOUND</code></td><td>No account with that <code>id</code>.</td></tr><tr><td>409</td><td><code>DUPLICATE_EMAIL</code></td><td>The email is already used.</td></tr><tr><td>409</td><td><code>LAST_ADMIN</code></td><td>The change would leave no active Admin.</td></tr></tbody></table></div><table class=""><thead><tr><th>action</th><th>Fields</th><th>Returns</th></tr></thead><tbody><tr><td>(none)</td><td><code>name</code>, <code>display_name</code>, <code>email</code>, <code>password</code> (at least 8 characters), <code>role</code> (default <code>hr_staff</code>)</td><td><code>201</code> <code>{ user, otp_sent: false, otp_disabled: true, challenge_id: null, emailId: null }</code></td></tr><tr><td><code>update</code></td><td><code>id</code>, <code>name</code>, <code>email</code>, <code>role</code> (optional)</td><td><code>{ user }</code></td></tr><tr><td><code>update_role</code></td><td><code>id</code>, <code>role</code></td><td><code>{ user }</code></td></tr><tr><td><code>set_status</code></td><td><code>id</code>, <code>status</code> (<code>active</code> or <code>inactive</code>)</td><td><code>{ user }</code></td></tr><tr><td><code>delete</code></td><td><code>id</code></td><td><code>{ deleted: true, id }</code></td></tr></tbody></table></section>
+<section id="employees"><h2>7. Employees</h2><div class="ep" id="ep-7"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/employees</span></div><div class="ep-sum">Lists all employees, ordered by employee number.</div><div class="ep-auth"><b>Access:</b> <code>employees.view</code></div><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "uuid",
+      "employee_number": "EMP-0001",
+      "first_name": "Juan",
+      "middle_name": null,
+      "last_name": "Dela Cruz",
+      "email": "juan@example.com",
+      "position": "Site Engineer",
+      "department": "Engineering",
+      "hire_date": "2025-02-01",
+      "employment_status": "Regular",
+      "status": "Active",
+      "basic_salary": "30000",
+      "position_rate": "1363.64",
+      "phone": null,
+      "address": null,
+      "birth_date": null,
+      "sss_number": null,
+      "philhealth_number": null,
+      "pagibig_number": null,
+      "tin": null,
+      "bank_name": null,
+      "bank_account_number": null,
+      "salary_grade_id": null,
+      "updated_at": null,
+      "separated_on": null
+    }
+  ]
+}</pre><p><code>sss_number</code>, <code>philhealth_number</code>, <code>pagibig_number</code>, <code>tin</code> and <code>bank_account_number</code> are left out for roles without <code>employees.sensitive.view</code>. This route returns numeric columns as strings.</p></div><div class="ep" id="ep-8"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/employees</span></div><div class="ep-sum">Creates an employee and assigns the salary for their position when one exists.</div><div class="ep-auth"><b>Access:</b> <code>employees.manage</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_number</code>, <code>first_name</code>, <code>last_name</code></td><td>Yes</td><td><code>employee_number</code> must be unique.</td></tr><tr><td><code>middle_name</code>, <code>email</code>, <code>position</code>, <code>department</code>, <code>hire_date</code>, <code>employment_status</code></td><td>No</td><td><code>employment_status</code> classifications: <code>Regular</code>, <code>Probationary</code>, <code>Part-Time</code>, <code>Contractual</code>, <code>Project-Based</code>, <code>Temporary</code>, or <code>Resigned</code>.</td></tr><tr><td><code>status</code></td><td>No</td><td>Default <code>Active</code>. Others: <code>Inactive</code>, <code>On Leave</code>.</td></tr><tr><td><code>phone</code>, <code>address</code>, <code>birth_date</code>, <code>sss_number</code>, <code>philhealth_number</code>, <code>pagibig_number</code>, <code>tin</code>, <code>bank_name</code>, <code>bank_account_number</code></td><td>No</td><td>Blank values are saved as null; at most 300 characters.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": {
+    "id": "uuid",
+    "employee_number": "EMP-0001",
+    "salary_assigned": true
+  }
+}</pre><p><code>201 Created</code> with the full employee record plus <code>salary_assigned</code>.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>409</td><td><code>DUPLICATE</code></td><td>The employee number already exists.</td></tr></tbody></table></div><div class="ep" id="ep-9"><div class="ep-head"><span class="m m-put">PUT</span><span class="path">/employees/{id}</span></div><div class="ep-sum">Replaces an employee record.</div><div class="ep-auth"><b>Access:</b> <code>employees.manage</code></div><p>Send every field, as for creating one: a field left out is cleared. A required field left out fails with <code>400 INVALID_REQUEST</code>, and <code>status</code> falls back to <code>Active</code>. Roles without <code>employees.sensitive.view</code> keep the stored sensitive values. The day an employee becomes inactive or resigned is recorded in <code>separated_on</code>.</p><h4>Response</h4><pre>{
+  "data": {
+    "id": "uuid",
+    "salary_assigned": false
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>NOT_FOUND</code></td><td>No employee with that id.</td></tr></tbody></table></div><div class="ep" id="ep-10"><div class="ep-head"><span class="m m-delete">DELETE</span><span class="path">/employees/{id}</span></div><div class="ep-sum">Deletes an employee and their HMO records. Returns <code>204</code>.</div><div class="ep-auth"><b>Access:</b> <code>employees.manage</code></div><p>Also returns <code>204</code> when the id does not exist.</p></div></section>
+<section id="dashboard"><h2>8. Dashboard and audit log</h2><div class="ep" id="ep-11"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/dashboard</span></div><div class="ep-sum">Pending approvals and employee figures for the signed-in role.</div><div class="ep-auth"><b>Access:</b> <code>dashboard.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "approvals": [
+      {
+        "key": "claims",
+        "label": "Claims",
+        "count": 3,
+        "detail": "3 claims to verify",
+        "action": "Review",
+        "link": "/claims-reimbursement/claims?status=pending"
+      }
+    ],
+    "departments": {
+      "total": 42,
+      "slices": [
+        {
+          "name": "Engineering",
+          "count": 20,
+          "percent": 48
+        }
+      ]
+    },
+    "employeeOverview": {
+      "total": 45,
+      "recordStatus": [
+        {
+          "name": "Active",
+          "count": 42
+        }
+      ],
+      "employmentType": [
+        {
+          "name": "Regular",
+          "count": 30
+        }
+      ]
+    }
+  }
+}</pre><p><code>approvals</code> keys: <code>claims</code>, <code>payroll-approval</code>, <code>payroll-payment</code>, <code>hmo</code>; each appears only when the role has the matching permission. <code>departments</code> lists the five largest departments, with <code>Other</code> for the rest. <code>departments</code> and <code>employeeOverview</code> are <code>null</code> without <code>employees.view</code>.</p></div><div class="ep" id="ep-12"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/audit-logs</span></div><div class="ep-sum">Logs &amp; Audit entries, newest first.</div><div class="ep-auth"><b>Access:</b> <code>audit.view</code></div><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "uuid",
+      "timestamp": "2026-11-05T01:00:00.000Z",
+      "user": "Maria Santos",
+      "role": "HR Staff",
+      "action": "Submitted payroll",
+      "module": "Payroll",
+      "description": "Submitted payroll for 2026-10-01 to 2026-10-15 for approval (42 employees, net ₱1,039,499.50).",
+      "ipDevice": "203.0.113.5 · Edge"
+    }
+  ]
+}</pre></div><div class="ep" id="ep-13"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/audit-logs</span></div><div class="ep-sum">Records activity the app reports, such as an export.</div><div class="ep-auth"><b>Access:</b> Bearer (any role)</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>action</code></td><td>Yes</td><td>Up to 120 characters.</td></tr><tr><td><code>module</code></td><td>No</td><td>Up to 80 characters.</td></tr><tr><td><code>description</code></td><td>No</td><td>Up to 1,000 characters.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": {
+    "recorded": true
+  }
+}</pre><p><code>201 Created</code>.</p></div></section>
+<section id="appdata"><h2>9. Synchronized app data</h2><p>Payroll runs, claims, leave, attendance, settings and notifications are saved as whole values under named keys. The server checks each write against the role and the workflow rules, whatever the browser sends, and logs the state changes it allows.</p><div class="ep" id="ep-14"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/app-data</span></div><div class="ep-sum">Reads the keys the signed-in role may read.</div><div class="ep-auth"><b>Access:</b> Bearer (rows follow the table below)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>scope</code></td><td>No</td><td><code>payroll-rules</code> returns only the rates and rules payroll needs, read-only, and requires <code>payroll.view</code>.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "key": "payroll:runs",
+      "value": [],
+      "deleted": false
+    }
+  ]
+}</pre><p>With <code>scope=payroll-rules</code> each item has only <code>key</code> and <code>value</code>.</p></div><div class="ep" id="ep-15"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/app-data</span></div><div class="ep-sum">Saves one key.</div><div class="ep-auth"><b>Access:</b> Bearer (rules below)</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>key</code></td><td>Yes</td><td>At most 200 characters, starting with <code>admin:</code>, <code>audit:</code>, <code>attendance:</code>, <code>benefits:</code>, <code>claims:</code>, <code>compensation:</code>, <code>deductions:</code>, <code>leave:</code>, <code>notifications:</code>, <code>payroll:</code>, <code>reimbursement:</code> or <code>settings:</code>.</td></tr><tr><td><code>value</code></td><td>Unless deleting</td><td>The whole new value.</td></tr><tr><td><code>deleted</code></td><td>No</td><td><code>true</code> deletes the key.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": {
+    "key": "payroll:runs",
+    "value": [],
+    "deleted": false
+  }
+}</pre><p>The returned <code>value</code> is what was stored; the server may restore fields it controls, so use it instead of what was sent.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_DATA_KEY</code></td><td>The key is not allowed.</td></tr><tr><td>403</td><td><code>FORBIDDEN</code></td><td>The role or a workflow rule refused the write. The message says why.</td></tr><tr><td>409</td><td><code>INVALID_TRANSITION</code></td><td>A payroll status change outside the lifecycle.</td></tr><tr><td>409</td><td><code>STRICT_MODE</code></td><td>Strict Mode blocks the new run: timesheet not locked, HR2 not synced to the cutoff end, or a run already exists for the cutoff.</td></tr></tbody></table></div><div class="ep" id="ep-16"><div class="ep-head"><span class="m m-delete">DELETE</span><span class="path">/app-data</span></div><div class="ep-sum">Deletes one key. Returns <code>204</code>.</div><div class="ep-auth"><b>Access:</b> Bearer (rules below)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>key</code></td><td>Yes</td><td>The key to delete. <code>payroll:runs</code> and <code>claims:records</code> cannot be deleted.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_DATA_KEY</code></td><td>The key is not allowed.</td></tr></tbody></table></div><h3>Keys and rules</h3><table class=""><thead><tr><th>Key</th><th>Read</th><th>Write</th><th>Rules</th></tr></thead><tbody><tr><td><code>payroll:runs</code></td><td>Any role</td><td>By step</td><td>See Payroll runs. Runs missing from a save are kept.</td></tr><tr><td><code>payroll:payouts</code></td><td>Any role</td><td><code>payroll.generate</code></td><td>Each employee's payout method and account.</td></tr><tr><td><code>payroll:records</code></td><td>Any role</td><td><code>payroll.generate</code> or <code>payroll.approve</code></td><td></td></tr><tr><td><code>payroll:timesheet-locks</code></td><td>Any role</td><td><code>payroll.generate</code></td><td>Locks are only added, and only once HR2 attendance reaches the cutoff end.</td></tr><tr><td><code>payroll:bank-results</code></td><td>Any role</td><td><code>payroll.release</code></td><td>Results are only added; each needs its run and cutoff dates.</td></tr><tr><td>Other <code>payroll:*</code>, <code>compensation:thirteenth-month-rules</code></td><td><code>settings.view</code></td><td><code>settings.edit</code></td><td>A withholding tax version used by a run cannot be changed or removed.</td></tr><tr><td><code>settings:*</code></td><td>Any role</td><td><code>settings.edit</code></td><td>Company, regional, branding, privacy and backup settings.</td></tr><tr><td><code>notifications:records</code></td><td>Any role</td><td>Any role</td><td>New ones must be unread. A user may only mark their own role's copies read; unread ones cannot be removed.</td></tr><tr><td><code>claims:records</code></td><td><code>claims.view</code></td><td><code>claims.encode</code>, <code>claims.approve</code></td><td>Decisions only: approve, return or reject. Claims come from ESS; details and payments cannot be changed here.</td></tr><tr><td><code>reimbursement:batches</code></td><td><code>claims.view</code></td><td>Server only</td><td>Changes only through the batch endpoints.</td></tr><tr><td>Other <code>claims:*</code>, <code>reimbursement:*</code></td><td><code>claims.view</code></td><td><code>claims.encode</code></td><td></td></tr><tr><td><code>attendance:hr2</code></td><td>Any role</td><td>Server only</td><td>Received only from HR2.</td></tr><tr><td>Other <code>attendance:*</code></td><td>Any role</td><td><code>attendance.encode</code></td><td>Saved records are locked; writes may only add.</td></tr><tr><td><code>leave:records</code></td><td>Any role</td><td><code>leave.encode</code>, <code>leave.approve</code></td><td>Starts <code>Pending</code>; a decided leave is locked.</td></tr><tr><td>Other <code>leave:*</code></td><td>Any role</td><td><code>leave.encode</code></td><td></td></tr><tr><td><code>deductions:other</code></td><td>Any role</td><td><code>deductions.manage</code></td><td>New ones must be active and authorized, and can only be stopped afterwards.</td></tr><tr><td>Other <code>deductions:*</code></td><td>Any role</td><td><code>deductions.manage</code></td><td></td></tr><tr><td>Other <code>compensation:*</code></td><td>Any role</td><td><code>compensation.manage</code></td><td></td></tr><tr><td><code>benefits:*</code></td><td>Any role</td><td><code>hmo.manage</code></td><td></td></tr><tr><td><code>admin:users</code></td><td><code>users.manage</code></td><td><code>users.manage</code></td><td></td></tr><tr><td><code>audit:*</code></td><td>Nobody</td><td>Nobody</td><td>Use <code>/audit-logs</code>.</td></tr></tbody></table></section>
+<section id="payroll"><h2>10. Payroll runs</h2><p>Runs are stored in the <code>payroll:runs</code> key. HR creates and moves them with <code>POST /app-data</code>, sending the whole list; funding, payslips, release and deletion have their own endpoints.</p><h3>Lifecycle</h3><table class=""><thead><tr><th>From</th><th>To</th><th>How</th><th>Permission</th><th>Conditions</th></tr></thead><tbody><tr><td>(new)</td><td>Draft</td><td>Save</td><td><code>payroll.generate</code></td><td>Prepared by the signed-in user. <code>payDate</code> must be the automatic date for the cutoff.</td></tr><tr><td>Draft, Computed, Returned</td><td>Computed</td><td>Save</td><td><code>payroll.generate</code></td><td>Each employee has a Pending payout line, and gross, deductions and net follow the register formulas.</td></tr><tr><td>Computed</td><td>Pending Approval</td><td>Save</td><td><code>payroll.generate</code></td><td>Contents unchanged.</td></tr><tr><td>Pending Approval</td><td>Approved, Returned, Rejected</td><td>Save</td><td><code>payroll.approve</code></td><td>Not the preparer. Returned and Rejected need a comment of at least 3 characters. Rejected is locked.</td></tr><tr><td>Approved</td><td>Funded</td><td><code>POST .../funding</code></td><td><code>payroll.fund</code></td><td>Optional step: payouts can also be exported directly from Approved.</td></tr><tr><td>Approved, Funded</td><td>Exported</td><td>Save</td><td><code>payroll.release</code></td><td>Comes with the first payout file.</td></tr><tr><td>Exported</td><td>Paid</td><td>Save</td><td><code>payroll.release</code></td><td>Every employee is Paid and <code>paidAt</code> is set.</td></tr><tr><td>Paid</td><td>Closed</td><td>Release endpoints</td><td><code>payroll.release</code> + passkey</td><td>Set by the server when every payslip is released.</td></tr></tbody></table><p>Payout line statuses: Pending, then Exported, then Paid or Failed (with a reason of at least 3 characters). A Failed line returns to Pending after its details are fixed; a Paid line is locked. Methods are <code>Bank</code>, <code>E-wallet</code> and <code>Cash</code>.</p><h3>Run object</h3><table class=""><thead><tr><th>Field</th><th>Notes</th></tr></thead><tbody><tr><td><code>id</code>, <code>runType</code>, <code>from</code>, <code>to</code>, <code>payDate</code>, <code>createdAt</code>, <code>preparedBy</code>, <code>preparedById</code></td><td>Fixed at creation. <code>runType</code> is <code>regular</code> or <code>thirteenth-month</code>.</td></tr><tr><td><code>status</code></td><td>Draft, Computed, Pending Approval, Returned, Rejected, Approved, Funded, Exported, Paid or Closed.</td></tr><tr><td><code>rows</code></td><td>One per employee: <code>input</code> (<code>empId</code>, <code>name</code> and pay inputs), <code>result</code> (<code>gross</code>, <code>deductions</code>, <code>net</code>, <code>tax</code>, ...), <code>hmo</code>, <code>position</code>, <code>governmentLoans</code>, <code>loanRepayments</code>.</td></tr><tr><td><code>payouts</code>, <code>exports</code></td><td>Payout line per employee number (<code>method</code>, <code>status</code>, <code>reason</code>, <code>exportId</code>, account details) and the exported files, which can only be added.</td></tr><tr><td><code>submittedAt</code>, <code>submittedBy</code>, <code>decidedBy</code>, <code>decidedById</code>, <code>decidedAt</code>, <code>decisionComment</code>, <code>paidAt</code>, <code>paidBy</code></td><td>Workflow details.</td></tr><tr><td><code>funding</code></td><td>Server only: <code>amount</code>, <code>confirmedAt</code>, <code>confirmedBy</code>, and for a receipt <code>receiptId</code>, <code>fileName</code>, <code>mimeType</code>, <code>size</code>, <code>uploadedAt</code>, <code>uploadedBy</code>.</td></tr><tr><td><code>payslipsGeneratedAt</code>, <code>payslipsGeneratedBy</code>, <code>released</code>, <code>essReleased</code>, <code>closedAt</code></td><td>Server only. <code>released</code> is by department, <code>essReleased</code> by employee number.</td></tr></tbody></table><h3>Endpoints</h3><div class="ep" id="ep-17"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/payroll/runs/{id}/register</span></div><div class="ep-sum">The Payroll Register of a run, built from its saved figures.</div><div class="ep-auth"><b>Access:</b> <code>payroll.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "company": "Archon Nell Inc.",
+    "runId": "PR-5F1C0A2B",
+    "cutoff": "Oct 1 – 15, 2026",
+    "payDate": "Oct 15, 2026",
+    "columns": [
+      {
+        "key": "basic",
+        "label": "Basic pay"
+      }
+    ],
+    "lines": [
+      {
+        "empId": "EMP-0001",
+        "name": "Ana Reyes",
+        "position": "Site Engineer",
+        "basic": 15000,
+        "allowance": 500,
+        "bonuses": 0,
+        "overtime": 360.58,
+        "holidayLeave": 0,
+        "absences": 0,
+        "lateUt": 144.23,
+        "sss": 750,
+        "philhealth": 375,
+        "pagibig": 100,
+        "hmo": 250,
+        "tax": 611.15,
+        "loans": 0,
+        "other": 0,
+        "gross": 15860.58,
+        "totalDeductions": 2230.38,
+        "net": 13630.2
+      }
+    ],
+    "totals": {
+      "gross": 15860.58,
+      "net": 13630.2
+    }
+  }
+}</pre><p>Gross = basic + allowance + bonuses + overtime + holidayLeave. Total deductions = absences + lateUt + sss + philhealth + pagibig + hmo + tax + loans + other. Net = gross - total deductions. The Tax column appears only when the Payroll Run Options turn it on.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>No run with that id.</td></tr></tbody></table></div><div class="ep" id="ep-18"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/payroll/runs/{id}/funding</span></div><div class="ep-sum">Confirms the payroll account is funded; the run becomes Funded.</div><div class="ep-auth"><b>Access:</b> <code>payroll.fund</code></div><p>The body is the raw receipt file, or empty to attach the receipt later. Set <code>Content-Type</code> to the file type and <code>X-File-Name</code> to the URI-encoded file name. JPG, PNG or PDF, at most 5 MB; the type is checked from the file content.</p><h4>Response</h4><pre>{
+  "data": {
+    "runs": [
+      "&lt;the full updated list of runs&gt;"
+    ]
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>No run with that id.</td></tr><tr><td>409</td><td><code>PAYROLL_NOT_APPROVED</code></td><td>The run is not Approved.</td></tr><tr><td>413</td><td><code>RECEIPT_TOO_LARGE</code></td><td>Over 5 MB.</td></tr><tr><td>415</td><td><code>RECEIPT_TYPE_NOT_ALLOWED</code></td><td>Not a JPG, PNG or PDF, or the type does not match the content.</td></tr></tbody></table></div><div class="ep" id="ep-19"><div class="ep-head"><span class="m m-put">PUT</span><span class="path">/payroll/runs/{id}/funding/receipt</span></div><div class="ep-sum">Attaches or replaces the receipt while the run is Funded.</div><div class="ep-auth"><b>Access:</b> <code>payroll.fund</code></div><p>Same file format as above; the file is required. A replaced file is deleted.</p><h4>Response</h4><pre>{
+  "data": {
+    "runs": [
+      "&lt;the full updated list of runs&gt;"
+    ]
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>RECEIPT_REQUIRED</code></td><td>No file was sent.</td></tr><tr><td>409</td><td><code>RECEIPT_LOCKED</code></td><td>The run is no longer Funded.</td></tr></tbody></table></div><div class="ep" id="ep-20"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/payroll/runs/{id}/funding/receipt</span></div><div class="ep-sum">Returns the receipt file itself, never cached.</div><div class="ep-auth"><b>Access:</b> <code>payroll.fund</code></div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>download</code></td><td>No</td><td>Any value downloads it instead of showing it inline.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>RECEIPT_NOT_FOUND</code></td><td>The run has no receipt.</td></tr></tbody></table></div><div class="ep" id="ep-21"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/payroll/payslips/generate</span></div><div class="ep-sum">Generates the payslips of a Paid run.</div><div class="ep-auth"><b>Access:</b> <code>payroll.release</code> + passkey</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>run_id</code></td><td>Yes</td><td></td></tr><tr><td><code>passkey</code></td><td>Yes</td><td>The signed-in user's passkey.</td></tr></tbody></table><h4>Response</h4><pre>// Generated
+{ "data": { "generated": true, "runs": ["&lt;the full updated list of runs&gt;"] } }
+
+// Passkey refused (still 200)
+{ "data": { "generated": false, "reason": "invalid" } }</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>No run with that id.</td></tr><tr><td>409</td><td><code>PAYROLL_NOT_PAID</code></td><td>The run is not Paid.</td></tr><tr><td>409</td><td><code>PAYSLIPS_ALREADY_GENERATED</code></td><td>Already generated.</td></tr></tbody></table></div><div class="ep" id="ep-22"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/payroll/payslips/release</span></div><div class="ep-sum">Releases payslips to ESS by department.</div><div class="ep-auth"><b>Access:</b> <code>payroll.release</code> + passkey</div><p>Each employee of those departments gets their payslip in ESS and a notification. The run closes when every payslip is released.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>run_id</code></td><td>Yes</td><td></td></tr><tr><td><code>departments</code></td><td>Yes</td><td>List of department names. Employees with no department are under <code>Unassigned</code>.</td></tr><tr><td><code>passkey</code></td><td>Yes</td><td></td></tr><tr><td><code>all</code></td><td>No</td><td><code>true</code> when this is Release All; used in the audit entry.</td></tr></tbody></table><h4>Response</h4><pre>// Released
+{ "data": { "released": true, "runs": ["&lt;the full updated list of runs&gt;"] } }
+
+// Passkey refused (still 200)
+{ "data": { "released": false, "reason": "locked", "locked_until": "2026-11-05T01:15:00.000Z" } }</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td><code>departments</code> is empty.</td></tr><tr><td>409</td><td><code>PAYROLL_NOT_PAID</code></td><td>The run is not Paid.</td></tr><tr><td>409</td><td><code>PAYSLIPS_ALREADY_RELEASED</code></td><td>Those departments are already released.</td></tr></tbody></table></div><div class="ep" id="ep-23"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/payroll/runs/{id}/ess-release</span></div><div class="ep-sum">Releases every unreleased payslip of a Paid or Closed run to ESS.</div><div class="ep-auth"><b>Access:</b> <code>payroll.release</code> + passkey</div><p>Releasing again sends only what is still unreleased, so nothing is sent twice.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>passkey</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>// Verified
+{ "data": { "verified": true, "sent": 40, "released": 42, "total": 42, "runs": ["&lt;the full list of runs&gt;"] } }
+
+// Passkey refused (still 200)
+{ "data": { "verified": false, "reason": "invalid" } }</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>409</td><td><code>RELEASE_NOT_ALLOWED</code></td><td>The run is not Paid or Closed.</td></tr></tbody></table></div><div class="ep" id="ep-24"><div class="ep-head"><span class="m m-delete">DELETE</span><span class="path">/payroll/runs/{id}</span></div><div class="ep-sum">Deletes a run in any status, including approved and paid ones.</div><div class="ep-auth"><b>Access:</b> <code>payroll.generate</code> or <code>payroll.approve</code></div><p>Its funding receipt, ESS payslips and payslip notifications go with it. The audit entry keeps its status and net pay.</p><h4>Response</h4><pre>{
+  "data": {
+    "runs": [
+      "&lt;the remaining runs&gt;"
+    ]
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>No run with that id.</td></tr></tbody></table></div><h3>Payroll corrections</h3><p>Employees request corrections from ESS. An approved correction is paid outside the system and is never added to a later run. Statuses: <code>Pending</code>, <code>Approved</code>, <code>Rejected</code>, <code>Completed</code>.</p><div class="ep" id="ep-25"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/payroll/corrections</span></div><div class="ep-sum">Lists all corrections, newest first.</div><div class="ep-auth"><b>Access:</b> <code>payroll.view</code></div><p>Each item has the shape shown under <code>GET /integrations/ess/corrections</code>.</p></div><div class="ep" id="ep-26"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/payroll/corrections/{id}</span></div><div class="ep-sum">Decides or completes a correction.</div><div class="ep-auth"><b>Access:</b> <code>payroll.approve</code> (approve, reject) or <code>payroll.release</code> (complete)</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>action</code></td><td>Yes</td><td><code>approve</code>, <code>reject</code> or <code>complete</code>. Only a Pending one can be approved or rejected; only an Approved one can be completed.</td></tr><tr><td><code>comment</code></td><td>To reject</td><td>At least 3 characters when rejecting; up to 500. Optional otherwise.</td></tr></tbody></table><p>Returns the correction.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>CORRECTION_NOT_FOUND</code></td><td>No correction with that id.</td></tr><tr><td>409</td><td><code>CORRECTION_NOT_ALLOWED</code></td><td>The action does not fit its status, the action is unknown, or the comment is missing.</td></tr></tbody></table></div><h3>Attendance</h3><div class="ep" id="ep-27"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/attendance/hr2/sync</span></div><div class="ep-sum">Reads the attendance HR2 has sent so far and logs the check.</div><div class="ep-auth"><b>Access:</b> <code>attendance.view</code></div><p>HR2 pushes attendance to PBMS; this does not call HR2.</p><h4>Response</h4><pre>{
+  "data": {
+    "syncedThrough": "2026-10-15",
+    "receivedAt": "2026-10-15T08:00:00.000Z",
+    "records": 2240
+  }
+}</pre></div></section>
+<section id="compensation"><h2>11. Compensation</h2><div class="ep" id="ep-28"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/compensation</span></div><div class="ep-sum">Everything the Compensation pages show.</div><div class="ep-auth"><b>Access:</b> <code>compensation.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "salary_grades": [],
+    "assignments": [],
+    "proposals": [],
+    "history": [],
+    "rewards": [],
+    "legacy_import_complete": true,
+    "legacy_import_counts": null
+  }
+}</pre></div><div class="ep" id="ep-29"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/compensation</span></div><div class="ep-sum">Runs a compensation action, chosen by <code>action</code>.</div><div class="ep-auth"><b>Access:</b> <code>compensation.approve</code> for reviews; <code>compensation.manage</code> for the rest</div><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>UNKNOWN_ACTION</code></td><td>The action is not supported.</td></tr><tr><td>400</td><td><code>INVALID_AMOUNT</code>, <code>INVALID_DATE</code>, <code>INVALID_ID</code>, <code>INVALID_DECISION</code></td><td>A field is invalid.</td></tr><tr><td>403</td><td><code>FORBIDDEN</code></td><td>Reviewing an entry the user created.</td></tr></tbody></table></div><table class=""><thead><tr><th>action</th><th>Fields</th><th>Specific errors</th></tr></thead><tbody><tr><td><code>create_grade</code></td><td><code>position</code>, <code>basic_salary</code>, <code>status</code> (<code>Active</code> default, or <code>Inactive</code>). The code (<code>SG-001</code>, ...) is generated.</td><td><code>INVALID_GRADE_STATUS</code>, <code>SALARY_GRADE_GENERATOR_NOT_READY</code> (503), <code>SALARY_GRADE_CODE_GENERATION_FAILED</code> (500), <code>LEGACY_COMPENSATION_IMPORT_REQUIRED</code> (409)</td></tr><tr><td><code>update_grade</code></td><td><code>id</code>, <code>position</code>, <code>basic_salary</code></td><td><code>SALARY_GRADE_NOT_FOUND</code> (404)</td></tr><tr><td><code>delete_grade</code></td><td><code>id</code></td><td><code>SALARY_GRADE_IN_USE</code> (409)</td></tr><tr><td><code>create_initial_assignment</code></td><td><code>employee_id</code>, <code>basic_salary</code>, <code>effective_date</code>, <code>salary_code</code> (optional)</td><td><code>EMPLOYEE_NOT_FOUND</code> (404), <code>COMPENSATION_ALREADY_ASSIGNED</code> (409), <code>INVALID_SALARY_GRADE</code></td></tr><tr><td><code>create_proposal</code></td><td><code>employee_id</code>, <code>proposal_type</code> (<code>Salary Adjustment</code>, <code>Merit Increase</code>, <code>Promotion Increase</code>), <code>effective_date</code>, <code>salary_code</code> or <code>new_salary</code>, <code>notes</code> (optional)</td><td><code>INVALID_PROPOSAL_TYPE</code>, <code>COMPENSATION_NOT_ASSIGNED</code> (409), <code>UNCHANGED_SALARY</code></td></tr><tr><td><code>review_proposal</code></td><td><code>id</code>, <code>decision</code> (<code>approve</code> or <code>reject</code>), <code>rejection_reason</code> (to reject)</td><td><code>PROPOSAL_NOT_FOUND</code> (404), <code>PROPOSAL_ALREADY_REVIEWED</code> (409)</td></tr><tr><td><code>create_reward</code></td><td><code>employee_id</code>, <code>reward_type</code> (<code>Allowance</code>, <code>Incentive</code>, <code>Bonus</code>), and the fields below</td><td><code>INVALID_REWARD_TYPE</code>, <code>INVALID_FREQUENCY</code>, <code>INVALID_ALLOWANCE_STATUS</code>, <code>INVALID_TAXABLE</code>, <code>INVALID_CUTOFF</code>, <code>INVALID_TAX_CATEGORY</code></td></tr><tr><td><code>update_reward</code></td><td><code>id</code> plus the same fields. An edited bonus or incentive returns to Pending. An allowance cannot become a bonus.</td><td><code>REWARD_NOT_FOUND</code> (404)</td></tr><tr><td><code>delete_reward</code></td><td><code>id</code></td><td><code>REWARD_NOT_FOUND</code> (404)</td></tr><tr><td><code>review_reward</code></td><td><code>id</code>, <code>decision</code> (default <code>approve</code>). Bonuses and incentives only.</td><td><code>REWARD_NOT_REVIEWABLE</code>, <code>REWARD_ALREADY_REVIEWED</code> (409)</td></tr><tr><td><code>approve_reward</code></td><td><code>id</code>. Same as <code>review_reward</code> with <code>approve</code>.</td><td>As above</td></tr><tr><td><code>import_legacy</code></td><td><code>legacy_data</code>, <code>retry_failed</code> (optional). One-time import of browser-stored compensation.</td><td><code>LEGACY_SALARY_GRADE_CODE_COLLISION</code> (409), <code>LEGACY_SALARY_GRADE_ID_COLLISION</code> (409)</td></tr></tbody></table><table class=""><thead><tr><th>Reward type</th><th>Fields</th></tr></thead><tbody><tr><td>Allowance</td><td><code>amount</code>, <code>allowance_type</code>, <code>frequency</code> (<code>Per Cutoff</code> or <code>Monthly</code>), <code>status</code> (<code>Active</code> or <code>Inactive</code>), <code>taxable</code> (boolean), <code>effective_date</code>, <code>notes</code> (optional)</td></tr><tr><td>Bonus, Incentive</td><td><code>amount</code>, <code>cutoff_start</code>, <code>cutoff_end</code>, <code>notes</code>, and <code>tax_category</code>: <code>christmas</code>, <code>productivity</code>, <code>loyalty</code>, <code>gift</code> or <code>similar</code> (count toward the ₱90,000 exemption), <code>commission</code> or <code>taxable</code>. Older clients may send <code>taxable</code> instead. Starts Pending.</td></tr></tbody></table></section>
+<section id="hmo"><h2>12. HMO benefits</h2><p>Maxicare is the only provider, and it is not connected to PBMS: HR records what was sent to Maxicare and what Maxicare answered. <code>{resource}</code> is <code>providers</code>, <code>plans</code>, <code>enrollments</code>, <code>dependents</code> or <code>history</code>; any other value returns <code>404 NOT_FOUND</code>.</p><p>Enrollment flow: submitted, approved or rejected by a different user, sent to Maxicare, then confirmed (Active) with the member ID or marked not accepted. A not-accepted request can be corrected and sent again. Plans, enrollments and dependents expire by date, checked when they are read.</p><div class="ep" id="ep-30"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/hmo/{resource}</span></div><div class="ep-sum">Lists the records of a resource.</div><div class="ep-auth"><b>Access:</b> <code>hmo.view</code></div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>page</code>, <code>page_size</code></td><td>No</td><td>History only. Defaults 1 and 25; <code>page_size</code> at most 100.</td></tr><tr><td><code>entity_type</code>, <code>entity_id</code>, <code>search</code></td><td>No</td><td>History only. Filters; <code>search</code> looks in the whole entry.</td></tr></tbody></table><p>Enrollments also include <code>employee</code>, <code>employee_eligibility_date</code>, <code>employee_eligible_for_effective_date</code> and <code>maxicare_answered_by_name</code>; dependents include <code>maxicare_answered_by_name</code>. History returns <code>{ items, page, page_size, total }</code>.</p></div><div class="ep" id="ep-31"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/hmo/{resource}/{id}</span></div><div class="ep-sum">Same as the list: the id is ignored on reads, so filter the result yourself.</div><div class="ep-auth"><b>Access:</b> <code>hmo.view</code></div></div><div class="ep" id="ep-32"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/hmo/{resource}</span></div><div class="ep-sum">Creates a record, or runs an action when the body has <code>action</code>.</div><div class="ep-auth"><b>Access:</b> <code>hmo.manage</code>; <code>hmo.approve</code> to approve or reject</div><p>Without <code>action</code> it creates a record and returns <code>201</code> with it. With <code>action</code>, send the record <code>id</code> in the body or path.</p></div><table class=""><thead><tr><th>Create</th><th>Required</th><th>Optional</th><th>Rules</th></tr></thead><tbody><tr><td>providers</td><td><code>name</code> (must be Maxicare)</td><td><code>contact_person</code>, <code>contact_number</code>, <code>status</code></td><td>One active provider.</td></tr><tr><td>plans</td><td><code>provider_id</code>, <code>name</code>, <code>coverage_start</code>, <code>coverage_end</code></td><td><code>annual_benefit_limit</code>, <code>inpatient</code>, <code>outpatient</code>, <code>emergency</code>, <code>preventive_care</code>, <code>dental</code>, <code>employee_monthly_premium</code>, <code>dependent_monthly_premium</code>, <code>dependent_company_share</code>, <code>dependent_member_share</code>, <code>collect_employee_share_via_payroll</code>, <code>status</code> (default <code>Draft</code>)</td><td>The company pays 100% of the employee premium. Dependent shares add up to 100%.</td></tr><tr><td>enrollments</td><td><code>plan_id</code>, <code>employee_id</code>, <code>effective_date</code></td><td><code>expiration_date</code></td><td>Active employee with 6 months of service by the effective date, no other open enrollment, and dates inside an active plan.</td></tr><tr><td>dependents</td><td><code>enrollment_id</code>, <code>name</code>, <code>relationship</code> (<code>Spouse</code> or <code>Child</code>)</td><td><code>date_of_birth</code>, <code>effective_date</code>, <code>expiration_date</code>, <code>company_sponsored</code></td><td>Enrollment must be Active. One company-sponsored dependent per employee; the first is by default.</td></tr></tbody></table><table class=""><thead><tr><th>action</th><th>Applies to</th><th>Fields</th><th>Result</th></tr></thead><tbody><tr><td><code>update</code></td><td>plans</td><td>Any plan field; <code>apply_to_dependents</code> (boolean) applies a new premium or split to current dependents</td><td>Plan updated; past runs keep their amounts.</td></tr><tr><td><code>approve</code></td><td>enrollments, dependents</td><td>—</td><td>Needs <code>hmo.approve</code>; not the submitter.</td></tr><tr><td><code>reject</code></td><td>enrollments, dependents</td><td><code>rejection_reason</code></td><td>Needs <code>hmo.approve</code>; not the submitter. Closes the request.</td></tr><tr><td><code>cancel</code></td><td>enrollments, dependents</td><td>—</td><td>Only the submitter, while pending. Closes it as Rejected.</td></tr><tr><td><code>submit_to_maxicare</code></td><td>enrollments, dependents</td><td>—</td><td>After approval: <code>maxicare_status</code> becomes Pending.</td></tr><tr><td><code>maxicare_reject</code></td><td>enrollments, dependents</td><td><code>rejection_reason</code></td><td>Marks it not accepted; HR and Admin are notified.</td></tr><tr><td><code>activate</code></td><td>enrollments, dependents</td><td><code>maxicare_reference</code>, <code>allow_shared</code> (optional)</td><td>Confirms it with the member ID; becomes Active.</td></tr><tr><td><code>correct_member_id</code></td><td>enrollments, dependents</td><td><code>maxicare_reference</code>, <code>reason</code>, <code>allow_shared</code> (optional)</td><td>Corrects a confirmed ID; the old one stays in history.</td></tr><tr><td><code>terminate</code></td><td>enrollments, dependents</td><td>—</td><td>Ends coverage. Ending an enrollment ends its dependents.</td></tr></tbody></table><p>Common HMO error codes. 400: <code>MAXICARE_REQUIRED</code>, <code>INVALID_HMO_DATE</code>, <code>INVALID_HMO_DATES</code>, <code>INVALID_EMPLOYEE_CONTRIBUTION_POLICY</code>, <code>INVALID_DEPENDENT_CONTRIBUTION_POLICY</code>, <code>INVALID_HMO_PLAN_STATUS</code>, <code>INELIGIBLE_DEPENDENT_RELATIONSHIP</code>, <code>MAXICARE_REFERENCE_REQUIRED</code>, <code>MAXICARE_REFERENCE_UNCHANGED</code>, <code>HMO_RECORD_ID_REQUIRED</code>, <code>HMO_PLAN_ID_REQUIRED</code>, <code>HMO_ACTION_NOT_SUPPORTED</code>. 403: <code>HMO_NOT_SUBMITTER</code>. 404: <code>HMO_RECORD_NOT_FOUND</code>, <code>HMO_PLAN_NOT_FOUND</code>, <code>HMO_ENROLLMENT_NOT_FOUND</code>, <code>EMPLOYEE_NOT_FOUND</code>. 405: <code>METHOD_NOT_ALLOWED</code>.</p><p>409: <code>HMO_SELF_APPROVAL</code>, <code>HMO_REQUEST_NOT_PENDING</code>, <code>HMO_ENROLLMENT_NOT_PENDING</code>, <code>HMO_DEPENDENT_NOT_PENDING</code>, <code>HMO_APPROVAL_REQUIRED</code>, <code>HMO_ALREADY_SUBMITTED</code>, <code>MAXICARE_SUBMISSION_REQUIRED</code>, <code>MAXICARE_CONFIRMATION_REQUIRED</code>, <code>MAXICARE_REFERENCE_IN_USE</code>, <code>MAXICARE_REFERENCE_SHARED</code> (resend with <code>allow_shared: true</code> if Maxicare confirmed it), <code>HMO_ENROLLMENT_EXISTS</code>, <code>HMO_ENROLLMENT_ALREADY_ACTIVE</code>, <code>HMO_ENROLLMENT_ALREADY_CLOSED</code>, <code>HMO_ENROLLMENT_NOT_ACTIVE</code>, <code>HMO_DEPENDENT_ALREADY_ACTIVE</code>, <code>HMO_DEPENDENT_ALREADY_CLOSED</code>, <code>HMO_PLAN_NOT_ACTIVE</code>, <code>HMO_PLAN_DATES_EXCLUDE_ENROLLMENTS</code>, <code>HMO_EFFECTIVE_DATE_OUTSIDE_PLAN</code>, <code>HMO_EXPIRATION_OUTSIDE_PLAN</code>, <code>EMPLOYEE_NOT_ACTIVE</code>, <code>EMPLOYEE_HIRE_DATE_REQUIRED</code>, <code>HMO_WAITING_PERIOD_NOT_COMPLETED</code>, <code>DEPENDENT_DATE_OUTSIDE_ENROLLMENT</code>, <code>COMPANY_SPONSORED_DEPENDENT_EXISTS</code>.</p><div class="ep" id="ep-33"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/hmo/{resource}/{id}</span></div><div class="ep-sum">Runs an action on the record in the path.</div><div class="ep-auth"><b>Access:</b> As above</div></div><div class="ep" id="ep-34"><div class="ep-head"><span class="m m-patch">PATCH</span><span class="path">/hmo/{resource}/{id}</span></div><div class="ep-sum">Runs an action, or updates a provider. <code>PUT</code> behaves the same.</div><div class="ep-auth"><b>Access:</b> As above</div><p>Providers accept <code>name</code> (Maxicare only), <code>contact_person</code>, <code>contact_number</code> and <code>status</code> without an action. Plans, enrollments and dependents need an action (<code>400</code> or <code>409 HMO_ACTION_REQUIRED</code> otherwise).</p></div><div class="ep" id="ep-35"><div class="ep-head"><span class="m m-put">PUT</span><span class="path">/hmo/{resource}/{id}</span></div><div class="ep-sum">Same as <code>PATCH</code>.</div><div class="ep-auth"><b>Access:</b> As above</div></div><div class="ep" id="ep-36"><div class="ep-head"><span class="m m-delete">DELETE</span><span class="path">/hmo/{resource}/{id}</span></div><div class="ep-sum">Always refused: <code>409 HMO_DELETE_NOT_ALLOWED</code>.</div><div class="ep-auth"><b>Access:</b> As above</div><p>HMO records are kept; terminate or archive them instead. <code>history</code> returns <code>405</code>.</p></div></section>
+<section id="loans"><h2>13. Loans</h2><h3>Cash advances</h3><p>New records are cash advances only; SSS and Pag-IBIG loans go in Government Loans.</p><div class="ep" id="ep-37"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/loans</span></div><div class="ep-sum">All loan records and their transactions.</div><div class="ep-auth"><b>Access:</b> <code>deductions.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "loans": [
+      {
+        "id": "uuid",
+        "employeeId": "uuid",
+        "employeeNumber": "EMP-0001",
+        "employeeName": "Juan Dela Cruz",
+        "department": "Engineering",
+        "recordType": "Cash Advance",
+        "loanType": "Salary Advance",
+        "purpose": "Medical expense",
+        "principalAmount": 5000,
+        "installmentCount": 2,
+        "installmentAmount": 2500,
+        "repaymentFrequency": "Per Payroll",
+        "repaymentStartDate": "2026-11-15",
+        "releaseDate": "2026-11-05",
+        "approvalStatus": "Approved",
+        "approvedBy": "uuid",
+        "approvedAt": "2026-11-05T02:00:00.000Z",
+        "rejectionReason": null,
+        "createdBy": "uuid",
+        "createdAt": "2026-11-05T01:00:00.000Z",
+        "updatedAt": "2026-11-05T02:00:00.000Z",
+        "outstandingBalance": 5000,
+        "repaymentsCompleted": 0
+      }
+    ],
+    "transactions": [
+      {
+        "id": "uuid",
+        "loanId": "uuid",
+        "eventType": "Approved",
+        "amount": 0,
+        "note": "HR approved this loan or cash advance for scheduled payroll repayment.",
+        "actorId": "uuid",
+        "payrollRunId": null,
+        "periodStart": null,
+        "periodEnd": null,
+        "createdAt": "2026-11-05T02:00:00.000Z"
+      }
+    ]
+  }
+}</pre></div><div class="ep" id="ep-38"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/loans/schedule</span></div><div class="ep-sum">Repayments due in a cutoff.</div><div class="ep-auth"><b>Access:</b> <code>payroll.view</code></div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>period_start</code>, <code>period_end</code></td><td>Yes</td><td>The cutoff dates.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "loanId": "uuid",
+      "employeeId": "uuid",
+      "employeeNumber": "EMP-0001",
+      "employeeName": "Juan Dela Cruz",
+      "recordType": "Cash Advance",
+      "loanType": "Salary Advance",
+      "amount": 2500,
+      "installmentNumber": 1,
+      "installmentCount": 2,
+      "outstandingAfter": 2500
+    }
+  ]
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_LOAN_DATE</code>, <code>INVALID_PAYROLL_PERIOD</code></td><td>The dates are invalid.</td></tr></tbody></table></div><div class="ep" id="ep-39"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/loans</span></div><div class="ep-sum">Records a cash advance as Pending. Returns <code>201</code>.</div><div class="ep-auth"><b>Access:</b> <code>loans.manage</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_id</code></td><td>Yes</td><td>An active employee.</td></tr><tr><td><code>record_type</code></td><td>Yes</td><td>Must be <code>Cash Advance</code>.</td></tr><tr><td><code>loan_type</code></td><td>Yes</td><td><code>Salary Advance</code>, <code>Emergency Cash Advance</code> or <code>Other Cash Advance</code>.</td></tr><tr><td><code>purpose</code></td><td>Yes</td><td>3 to 500 characters.</td></tr><tr><td><code>principal_amount</code></td><td>Yes</td><td>More than 0.</td></tr><tr><td><code>installment_count</code></td><td>Yes</td><td>Whole number, 1 to 1,000.</td></tr><tr><td><code>release_date</code>, <code>repayment_start_date</code></td><td>Yes</td><td>Repayment cannot start before release.</td></tr><tr><td><code>repayment_frequency</code></td><td>Yes</td><td><code>Per Payroll</code>, <code>Monthly First Cutoff</code> or <code>Monthly Second Cutoff</code>.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_LOAN_TYPE</code>, <code>INVALID_LOAN_CATEGORY</code>, <code>INVALID_LOAN_PURPOSE</code>, <code>INVALID_LOAN_AMOUNT</code>, <code>INVALID_INSTALLMENT_COUNT</code>, <code>INVALID_LOAN_DATE</code>, <code>INVALID_REPAYMENT_TERMS</code>, <code>INVALID_REPAYMENT_FREQUENCY</code></td><td>A field is invalid.</td></tr><tr><td>404</td><td><code>EMPLOYEE_NOT_FOUND</code></td><td>Unknown employee.</td></tr><tr><td>409</td><td><code>EMPLOYEE_NOT_ACTIVE</code></td><td>The employee is not active.</td></tr></tbody></table></div><div class="ep" id="ep-40"><div class="ep-head"><span class="m m-patch">PATCH</span><span class="path">/loans/{id}</span></div><div class="ep-sum">Approves or rejects a Pending record.</div><div class="ep-auth"><b>Access:</b> <code>loans.manage</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>action</code></td><td>Yes</td><td><code>approve</code> or <code>reject</code>.</td></tr><tr><td><code>rejection_reason</code></td><td>To reject</td><td>Up to 500 characters.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>LOAN_ACTION_NOT_SUPPORTED</code>, <code>INVALID_REJECTION_REASON</code></td><td>A field is invalid.</td></tr><tr><td>404</td><td><code>LOAN_NOT_FOUND</code></td><td>Unknown record.</td></tr><tr><td>409</td><td><code>LOAN_NOT_PENDING</code>, <code>EMPLOYEE_NOT_ACTIVE</code></td><td>It cannot be reviewed now.</td></tr></tbody></table></div><div class="ep" id="ep-41"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/loans/settle</span></div><div class="ep-sum">Posts the repayments of a Paid run once.</div><div class="ep-auth"><b>Access:</b> <code>payroll.release</code></div><p>With <code>validate_only</code>, it runs every check without saving, and also accepts an Exported run. Posting again returns <code>idempotent: true</code>.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>payroll_run_id</code></td><td>Yes</td><td></td></tr><tr><td><code>validate_only</code></td><td>No</td><td><code>true</code> to check only.</td></tr></tbody></table><h4>Response</h4><pre>// Posted
+{ "data": { "posted": true, "count": 3, "totalAmount": 7500, "idempotent": false } }
+
+// validate_only
+{ "data": { "valid": true, "count": 3, "totalAmount": 7500 } }</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>DUPLICATE_LOAN_REPAYMENT</code>, <code>INVALID_PAYROLL_PERIOD</code>, <code>INVALID_PAYROLL_RUN_DATE</code></td><td>The run has a repeated installment or invalid dates.</td></tr><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>Unknown run.</td></tr><tr><td>409</td><td><code>PAYROLL_NOT_PAID</code></td><td>Not every employee is Paid.</td></tr><tr><td>409</td><td><code>PAYROLL_LOAN_AMOUNT_MISMATCH</code>, <code>PAYROLL_LOAN_TOTAL_MISMATCH</code>, <code>PAYROLL_LOAN_SCHEDULE_CHANGED</code>, <code>PAYROLL_LOAN_EMPLOYEE_MISMATCH</code>, <code>LOAN_APPROVAL_REQUIRED</code></td><td>The run no longer matches the loan schedule; rebuild it.</td></tr><tr><td>409</td><td><code>PAYROLL_LOAN_REPAYMENT_CONFLICT</code>, <code>PAYROLL_PERIOD_ALREADY_SETTLED</code></td><td>A different batch exists for this run or period.</td></tr></tbody></table></div><h3>Government loans</h3><p>SSS and Pag-IBIG loans encoded from the agency notice. These routes use the HMO permissions (<code>hmo.view</code>, <code>hmo.manage</code>). Statuses: <code>Pending</code>, <code>Active</code>, <code>Rejected</code>, <code>Closed</code>.</p><div class="ep" id="ep-42"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/government-loans</span></div><div class="ep-sum">All government loans and their deduction transactions.</div><div class="ep-auth"><b>Access:</b> <code>hmo.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "loans": [
+      {
+        "id": "uuid",
+        "employeeId": "uuid",
+        "employeeNumber": "EMP-0001",
+        "employeeName": "Juan Dela Cruz",
+        "department": "Engineering",
+        "loanType": "SSS",
+        "referenceNo": "SSS-12345",
+        "totalAmount": 24000,
+        "monthlyAmortization": 2000,
+        "startDate": "2026-11-01",
+        "outstandingBalance": 24000,
+        "status": "Active",
+        "noticeName": "notice.pdf",
+        "remarks": "",
+        "rejectionRemarks": null,
+        "verifiedBy": "uuid",
+        "verifiedAt": "2026-11-05T02:00:00.000Z",
+        "rejectedAt": null,
+        "closedAt": null,
+        "createdBy": "uuid",
+        "createdAt": "2026-11-05T01:00:00.000Z",
+        "updatedAt": "2026-11-05T02:00:00.000Z"
+      }
+    ],
+    "transactions": [
+      {
+        "id": "uuid",
+        "loanId": "uuid",
+        "payrollRunId": "uuid",
+        "periodStart": "2026-11-01",
+        "periodEnd": "2026-11-15",
+        "amount": 1000,
+        "balanceAfter": 23000,
+        "postedBy": "uuid",
+        "createdAt": "2026-11-30T02:00:00.000Z"
+      }
+    ]
+  }
+}</pre></div><div class="ep" id="ep-43"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/government-loans/schedule</span></div><div class="ep-sum">Active loans payroll may deduct in a cutoff.</div><div class="ep-auth"><b>Access:</b> <code>payroll.view</code></div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>period_start</code>, <code>period_end</code></td><td>Yes</td><td>The cutoff dates.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "loanId": "uuid",
+      "employeeId": "uuid",
+      "employeeNumber": "EMP-0001",
+      "employeeName": "Juan Dela Cruz",
+      "loanType": "SSS",
+      "referenceNo": "SSS-12345",
+      "monthlyAmortization": 2000,
+      "outstandingBalance": 24000
+    }
+  ]
+}</pre></div><div class="ep" id="ep-44"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/government-loans/{id}/notice</span></div><div class="ep-sum">The attached agency notice.</div><div class="ep-auth"><b>Access:</b> <code>hmo.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "name": "notice.pdf",
+    "data": "data:application/pdf;base64,..."
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>NOTICE_NOT_FOUND</code></td><td>No notice for that loan.</td></tr></tbody></table></div><div class="ep" id="ep-45"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/government-loans</span></div><div class="ep-sum">Encodes a loan as Pending. Returns <code>201</code>.</div><div class="ep-auth"><b>Access:</b> <code>hmo.manage</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_id</code></td><td>Yes</td><td></td></tr><tr><td><code>loan_type</code></td><td>Yes</td><td><code>SSS</code> or <code>Pag-IBIG</code>.</td></tr><tr><td><code>reference_no</code></td><td>Yes</td><td>Unique among non-rejected loans; up to 100 characters.</td></tr><tr><td><code>total_amount</code>, <code>monthly_amortization</code></td><td>Yes</td><td>More than 0; amortization cannot exceed the total.</td></tr><tr><td><code>start_date</code></td><td>Yes</td><td></td></tr><tr><td><code>notice_name</code>, <code>notice_data</code></td><td>Yes</td><td>PDF, PNG or JPG as a base64 data URL, 3 MB or smaller.</td></tr><tr><td><code>remarks</code></td><td>No</td><td>Up to 1,000 characters.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>INVALID_LOAN_TYPE</code>, <code>INVALID_REFERENCE</code>, <code>INVALID_AMORTIZATION</code>, <code>INVALID_LOAN_AMOUNT</code>, <code>INVALID_LOAN_DATE</code>, <code>NOTICE_REQUIRED</code>, <code>INVALID_NOTICE</code>, <code>NOTICE_TOO_LARGE</code></td><td>A field is invalid.</td></tr><tr><td>404</td><td><code>EMPLOYEE_NOT_FOUND</code></td><td>Unknown employee.</td></tr><tr><td>409</td><td><code>DUPLICATE_REFERENCE</code></td><td>The reference is already used.</td></tr></tbody></table></div><div class="ep" id="ep-46"><div class="ep-head"><span class="m m-patch">PATCH</span><span class="path">/government-loans/{id}</span></div><div class="ep-sum">Edits, verifies or rejects a Pending loan.</div><div class="ep-auth"><b>Access:</b> <code>hmo.manage</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>action</code></td><td>Yes</td><td><code>update</code> (all fields as for creating; the notice is optional), <code>verify</code> (becomes Active) or <code>reject</code>.</td></tr><tr><td><code>remarks</code></td><td>To reject</td><td>Up to 1,000 characters.</td></tr></tbody></table><p>Returns the loan.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>LOAN_ACTION_NOT_SUPPORTED</code>, <code>INVALID_REMARKS</code></td><td>A field is invalid.</td></tr><tr><td>404</td><td><code>LOAN_NOT_FOUND</code></td><td>Unknown loan.</td></tr><tr><td>409</td><td><code>LOAN_NOT_PENDING</code></td><td>It is no longer Pending.</td></tr></tbody></table></div><div class="ep" id="ep-47"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/government-loans/settle</span></div><div class="ep-sum">Posts the deductions of a Paid run once; a loan reaching zero closes.</div><div class="ep-auth"><b>Access:</b> <code>payroll.release</code></div><p>A run posts completely or not at all. With <code>validate_only</code>, it checks without saving, and also accepts an Exported run. A retry also repairs a balance an interrupted attempt left behind.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>payroll_run_id</code></td><td>Yes</td><td></td></tr><tr><td><code>validate_only</code></td><td>No</td><td><code>true</code> to check only.</td></tr></tbody></table><h4>Response</h4><pre>// Posted
+{ "data": { "posted": true, "count": 2, "totalAmount": 2000, "idempotent": false } }
+
+// validate_only
+{ "data": { "valid": true, "count": 2, "totalAmount": 2000, "alreadyPosted": 0 } }</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>DUPLICATE_LOAN_DEDUCTION</code></td><td>The same loan appears twice.</td></tr><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code>, <code>LOAN_NOT_FOUND</code></td><td>Unknown run or loan.</td></tr><tr><td>409</td><td><code>PAYROLL_NOT_PAID</code></td><td>Not every employee is Paid.</td></tr><tr><td>409</td><td><code>GOVERNMENT_LOAN_AMOUNT_MISMATCH</code>, <code>GOVERNMENT_LOAN_EMPLOYEE_MISMATCH</code>, <code>LOAN_NOT_ACTIVE</code>, <code>LOAN_BALANCE_EXCEEDED</code></td><td>The run no longer matches the loans; rebuild it.</td></tr></tbody></table></div></section>
+<section id="claims"><h2>14. Claims and reimbursement</h2><p>Employees submit claims through ESS. PBMS users approve, return or reject them by saving <code>claims:records</code> (see Synchronized app data), then record the payment here. Money is sent outside PBMS. Claim objects use camelCase fields such as <code>claimNumber</code>, <code>approvalStatus</code>, <code>paymentStatus</code>, <code>paymentMethod</code>, <code>paymentReference</code> and <code>paymentDate</code>.</p><div class="ep" id="ep-48"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/claims/totals</span></div><div class="ep-sum">Claim totals by month, type and status, with no employee or receipt details.</div><div class="ep-auth"><b>Access:</b> <code>claims.view</code> or <code>payroll.view</code></div><h4>Response</h4><pre>{
+  "data": [
+    {
+      "month": "2026-10",
+      "claimType": "Transportation",
+      "status": "Paid",
+      "count": 4,
+      "amount": 1802
+    }
+  ]
+}</pre></div><div class="ep" id="ep-49"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/claims/{id}/receipt</span></div><div class="ep-sum">A claim's receipt file.</div><div class="ep-auth"><b>Access:</b> <code>claims.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "name": "taxi-receipt.jpg",
+    "mime_type": "image/jpeg",
+    "data_url": "data:image/jpeg;base64,..."
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>RECEIPT_NOT_FOUND</code></td><td>No receipt on file.</td></tr></tbody></table></div><div class="ep" id="ep-50"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/claims/{id}/payment-proof</span></div><div class="ep-sum">A claim's proof of payment, or its batch's proof.</div><div class="ep-auth"><b>Access:</b> <code>claims.view</code></div><h4>Response</h4><pre>{
+  "data": {
+    "name": "bdo-confirmation.pdf",
+    "mime_type": "application/pdf",
+    "data_url": "data:application/pdf;base64,..."
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PROOF_NOT_FOUND</code></td><td>No proof attached.</td></tr></tbody></table></div><div class="ep" id="ep-51"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/claims/{id}/payment</span></div><div class="ep-sum">Records the reimbursement of one approved claim.</div><div class="ep-auth"><b>Access:</b> <code>claims.pay</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>method</code></td><td>Yes</td><td><code>Bank Transfer</code>, <code>Cash</code> or <code>E-wallet</code>.</td></tr><tr><td><code>reference</code></td><td>Yes</td><td>Transaction or cash voucher number, 3 to 100 characters.</td></tr><tr><td><code>date</code></td><td>Yes</td><td>Not in the future, and not before the expense date.</td></tr><tr><td><code>proof</code></td><td>For cash</td><td><code>{ name, mime_type, data }</code>: JPEG, PNG or PDF as base64, 3 MB or smaller.</td></tr></tbody></table><h4>Example request</h4><pre>{
+  "method": "Bank Transfer",
+  "reference": "BDO-778899",
+  "date": "2026-10-27"
+}</pre><p>Returns the updated claim. The employee gets an ESS notification.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>CLAIM_PAYMENT_REFUSED</code></td><td>A field is invalid. The message says which.</td></tr><tr><td>403</td><td><code>CLAIM_PAYMENT_REFUSED</code></td><td>It is your own claim, or you approved it.</td></tr><tr><td>404</td><td><code>CLAIM_NOT_FOUND</code></td><td>Unknown claim.</td></tr><tr><td>409</td><td><code>CLAIM_PAYMENT_REFUSED</code></td><td>The claim is not approved, or is already reimbursed.</td></tr><tr><td>409</td><td><code>CLAIM_IN_BATCH</code></td><td>The claim is in a batch: mark it paid or cancel it.</td></tr></tbody></table></div><div class="ep" id="ep-52"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/claims/batches</span></div><div class="ep-sum">Creates a batch of approved claims paid by one bank transfer. Returns <code>201</code>.</div><div class="ep-auth"><b>Access:</b> <code>claims.pay</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>claim_ids</code></td><td>Yes</td><td>1 to 500 approved, unpaid claims not in another batch.</td></tr><tr><td><code>pay_date</code></td><td>Yes</td><td>Today or later.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": {
+    "id": "rb-20261105010000-ab12cd",
+    "number": "RB-2026-11-001",
+    "status": "Exported",
+    "payDate": "2026-11-06",
+    "claimIds": [
+      "uuid"
+    ],
+    "total": 450.5,
+    "createdAt": "2026-11-05T01:00:00.000Z",
+    "createdBy": "Maria Santos",
+    "createdById": "uuid"
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400 / 403 / 404 / 409</td><td><code>BATCH_REFUSED</code></td><td>A claim or the date is not allowed. The message says why.</td></tr></tbody></table></div><div class="ep" id="ep-53"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/claims/batches/{id}/payment</span></div><div class="ep-sum">Marks a batch paid after the bank transfer.</div><div class="ep-auth"><b>Access:</b> <code>claims.pay</code></div><p>Claims the bank did not pay go back to the queue.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>reference</code></td><td>Yes</td><td>Bank reference, 3 to 100 characters.</td></tr><tr><td><code>date</code></td><td>Yes</td><td>Not in the future, and not before any expense date.</td></tr><tr><td><code>failed_claim_ids</code></td><td>No</td><td>Claims in the batch that were not paid. If all failed, cancel the batch instead.</td></tr><tr><td><code>proof</code></td><td>No</td><td><code>{ name, mime_type, data }</code> as above.</td></tr></tbody></table><p>Returns the batch with <code>status: "Paid"</code>, <code>paidClaimIds</code>, <code>failedClaimIds</code>, <code>paidTotal</code>, <code>reference</code>, <code>paymentDate</code>, <code>paidAt</code>, <code>paidBy</code>, <code>paidById</code> and <code>hasProof</code>.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400 / 403 / 404 / 409</td><td><code>BATCH_PAYMENT_REFUSED</code></td><td>The message says why.</td></tr></tbody></table></div><div class="ep" id="ep-54"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/claims/batches/{id}/cancel</span></div><div class="ep-sum">Cancels an unpaid batch; its claims return to the queue.</div><div class="ep-auth"><b>Access:</b> <code>claims.pay</code></div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>reason</code></td><td>Yes</td><td>At least 3 characters.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>BATCH_NOT_FOUND</code></td><td>Unknown batch.</td></tr><tr><td>409</td><td><code>BATCH_CLOSED</code></td><td>Already paid or cancelled.</td></tr></tbody></table></div></section>
+<section id="hr2"><h2>15. Integration: HR2 attendance</h2><p>HR2 sends daily attendance to PBMS. Send at least once before each cutoff closes (the 15th and the end of the month), with <code>synced_through</code> set to the cutoff's last day. PBMS never calls HR2.</p><div class="ep" id="ep-55"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/integrations/hr2/attendance</span></div><div class="ep-sum">Receives attendance records.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (HR2)</div><p>One record per employee per date: sending the same pair again replaces the earlier record, so corrections are made by resending. Send every work day, including <code>Absent</code> and <code>Day Off</code>; a work day with no record is not paid. Valid records are saved even when others in the request are rejected.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>synced_through</code></td><td>Recommended</td><td>Last date HR2 has finished. It never moves backwards. If omitted, the latest record date counts.</td></tr><tr><td><code>records</code></td><td>Yes</td><td>At most 5,000 per request.</td></tr><tr><td><code>records[].employee_no</code></td><td>Yes</td><td>As in PBMS. Case and surrounding spaces are ignored.</td></tr><tr><td><code>records[].date</code></td><td>Yes</td><td><code>YYYY-MM-DD</code>.</td></tr><tr><td><code>records[].status</code></td><td>Yes</td><td><code>Present</code>, <code>Absent</code>, <code>On Leave</code> or <code>Day Off</code>.</td></tr><tr><td><code>records[].time_in</code>, <code>time_out</code></td><td>For <code>Present</code></td><td>24-hour <code>HH:MM</code> or null. A <code>Present</code> day without both is not paid.</td></tr><tr><td><code>records[].worked_hours</code></td><td>No</td><td>0 to 24, or null.</td></tr><tr><td><code>records[].late_min</code>, <code>undertime_min</code>, <code>ot_min</code></td><td>No</td><td>Whole minutes, 0 to 1,440; default 0. Used as received.</td></tr><tr><td><code>records[].ot_status</code></td><td>When <code>ot_min</code> &gt; 0</td><td><code>Approved</code>, <code>Pending</code>, <code>Rejected</code> or null. Only <code>Approved</code> overtime is paid.</td></tr><tr><td><code>records[].leave_type</code></td><td>No</td><td>For <code>On Leave</code> days. Up to 100 characters.</td></tr></tbody></table><h4>Example request</h4><pre>{
+  "synced_through": "2026-10-15",
+  "records": [
+    {
+      "employee_no": "EMP-0001",
+      "date": "2026-10-01",
+      "time_in": "08:12",
+      "time_out": "17:30",
+      "worked_hours": 8.3,
+      "late_min": 12,
+      "undertime_min": 0,
+      "ot_min": 30,
+      "status": "Present",
+      "leave_type": null,
+      "ot_status": "Approved"
+    }
+  ]
+}</pre><h4>Response</h4><pre>{
+  "data": {
+    "received": 118,
+    "rejected": [
+      {
+        "index": 7,
+        "employee_no": "EMP-9999",
+        "date": "2026-10-03",
+        "reason": "employee_no is not a PBMS employee"
+      }
+    ],
+    "synced_through": "2026-10-15",
+    "total_records": 2240
+  }
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td><code>records</code> is not a list, or <code>synced_through</code> is not a date.</td></tr><tr><td>413</td><td><code>TOO_MANY_RECORDS</code></td><td>More than 5,000 records.</td></tr><tr><td>503</td><td><code>HR2_NOT_CONFIGURED</code></td><td><code>HR2_API_KEY</code> is not set.</td></tr></tbody></table></div><pre>curl -X POST "https://&lt;pbms-render-host&gt;/integrations/hr2/attendance" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $PBMS_HR2_API_KEY" \
+  -d '{"synced_through":"2026-10-15","records":[...]}'</pre></section>
+<section id="finance"><h2>16. Integration: Finance</h2><p>Finance reads submitted runs: their figures, decision, funding and payout progress. Decisions are made in PBMS, so this API is read-only. Runs still being prepared (Draft, Computed) are not listed.</p><div class="ep" id="ep-56"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/finance/payroll-runs</span></div><div class="ep-sum">Lists submitted runs, newest first.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (Finance)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>status</code></td><td>No</td><td><code>pending</code>, <code>returned</code>, <code>rejected</code>, <code>approved</code>, <code>funded</code>, <code>exported</code>, <code>paid</code> or <code>closed</code>.</td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "5f1c...",
+      "run_type": "regular",
+      "period_from": "2026-10-01",
+      "period_to": "2026-10-15",
+      "pay_date": "2026-10-15",
+      "status": "exported",
+      "employees": 42,
+      "totals": {
+        "gross": 1250000,
+        "deductions": 210500.5,
+        "net": 1039499.5,
+        "withholding_tax": 85210.25
+      },
+      "prepared_by": "HR User",
+      "submitted_at": "2026-10-13T02:10:00.000Z",
+      "decided_by": "Admin User",
+      "decided_at": "2026-10-13T05:00:00.000Z",
+      "decision_comment": null,
+      "funded_at": "2026-10-14T01:00:00.000Z",
+      "funding_amount": 1039499.5,
+      "funding_receipt": {
+        "file_name": "bdo-transfer.pdf",
+        "mime_type": "application/pdf",
+        "size_bytes": 182340,
+        "uploaded_by": "Admin User",
+        "uploaded_at": "2026-10-14T01:00:00.000Z"
+      },
+      "payouts": {
+        "pending": 0,
+        "exported": 40,
+        "paid": 1,
+        "failed": 1
+      },
+      "paid_at": null,
+      "closed_at": null
+    }
+  ]
+}</pre><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td>Invalid <code>status</code>.</td></tr><tr><td>503</td><td><code>FINANCE_NOT_CONFIGURED</code></td><td><code>FINANCE_API_KEY</code> is not set.</td></tr></tbody></table></div><div class="ep" id="ep-57"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/finance/payroll-runs/{id}</span></div><div class="ep-sum">One run with its employees.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (Finance)</div><p>The same fields plus <code>rows</code>: <code>employee_no</code>, <code>name</code>, <code>gross</code>, <code>deductions</code>, <code>net</code>, <code>withholding_tax</code>, <code>sss</code>, <code>philhealth</code>, <code>pagibig</code>, <code>employer_sss</code>, <code>employer_philhealth</code>, <code>employer_pagibig</code>, <code>payout_method</code>, <code>payout_status</code> and <code>payout_failure_reason</code>.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code></td><td>No submitted run with that id.</td></tr></tbody></table></div><div class="ep" id="ep-58"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/finance/payroll-runs/{id}/funding-receipt</span></div><div class="ep-sum">The funding receipt file (JPG, PNG or PDF).</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (Finance)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>download</code></td><td>No</td><td><code>1</code> downloads it instead of showing it inline.</td></tr></tbody></table><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>404</td><td><code>PAYROLL_RUN_NOT_FOUND</code>, <code>RECEIPT_NOT_FOUND</code></td><td>Unknown run, or it has no receipt.</td></tr></tbody></table></div><div class="ep" id="ep-59"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/integrations/finance/payroll-runs/{id}/decision</span></div><div class="ep-sum">Removed: always returns <code>410 DECISIONS_IN_PBMS</code>.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (Finance)</div></div></section>
+<section id="ess"><h2>17. Integration: ESS</h2><p>ESS sends employees' claims and correction requests to PBMS, and reads back statuses, payslips and notifications. PBMS never calls ESS. Every route needs the ESS key, and returns <code>503 ESS_NOT_CONFIGURED</code> until <code>ESS_API_KEY</code> is set. For the routes that take <code>employee_no</code>: <code>400 VALIDATION_ERROR</code> when it is missing and <code>404 EMPLOYEE_NOT_FOUND</code> when unknown.</p><div class="ep" id="ep-60"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/integrations/ess/claims</span></div><div class="ep-sum">Submits a claim. Returns <code>201</code>, or <code>200</code> for a repeated <code>ess_reference</code>.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><p>An employee who has left can submit for 30 days after leaving.</p><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td>As in PBMS.</td></tr><tr><td><code>claim_type</code></td><td>Yes</td><td><code>Food</code>, <code>Transportation</code> or <code>Office Supplies</code>.</td></tr><tr><td><code>amount</code></td><td>Yes</td><td>More than 0, at most 1,000,000, up to 2 decimals.</td></tr><tr><td><code>date</code></td><td>Yes</td><td>Not in the future (Philippine time).</td></tr><tr><td><code>business_purpose</code></td><td>Yes</td><td>5 to 1,000 characters.</td></tr><tr><td><code>project_site</code></td><td>No</td><td>Up to 200 characters.</td></tr><tr><td><code>receipt</code></td><td>Yes</td><td><code>name</code>, <code>mime_type</code> (<code>image/jpeg</code>, <code>image/png</code> or <code>application/pdf</code>) and <code>data</code> (base64, 3 MB or smaller).</td></tr><tr><td><code>certified</code></td><td>Yes</td><td>Must be <code>true</code>: the employee confirms a business expense.</td></tr><tr><td><code>ess_reference</code></td><td>Recommended</td><td>ESS's own id, up to 100 characters. Sending it again returns the claim already received.</td></tr></tbody></table><h4>Example request</h4><pre>{
+  "employee_no": "EMP-0001",
+  "claim_type": "Transportation",
+  "amount": 450.5,
+  "date": "2026-10-20",
+  "business_purpose": "Taxi to the Makati client site for the site inspection.",
+  "project_site": "Makati Tower",
+  "receipt": {
+    "name": "taxi-receipt.jpg",
+    "mime_type": "image/jpeg",
+    "data": "&lt;base64&gt;"
+  },
+  "certified": true,
+  "ess_reference": "ESS-CLM-88412"
+}</pre><p>Returns the claim, shaped as in the list below.</p><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>403</td><td><code>EMPLOYEE_NOT_ACTIVE</code></td><td>The employee left more than 30 days ago.</td></tr></tbody></table></div><div class="ep" id="ep-61"><div class="ep-head"><span class="m m-put">PUT</span><span class="path">/integrations/ess/claims/{claimNumber}</span></div><div class="ep-sum">Resubmits a Returned claim, with all fields again. It goes back to Pending Approval.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Errors</h4><table class=""><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>403</td><td><code>EMPLOYEE_NOT_ACTIVE</code></td><td>As above.</td></tr><tr><td>404</td><td><code>CLAIM_NOT_FOUND</code></td><td>No such claim for that employee.</td></tr><tr><td>409</td><td><code>CLAIM_NOT_RETURNED</code></td><td>Only a Returned claim can be resubmitted.</td></tr></tbody></table></div><div class="ep" id="ep-62"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/ess/claims</span></div><div class="ep-sum">An employee's claims, newest first.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "claim_number": "CLM-2026-0042",
+      "claim_type": "Transportation",
+      "amount": 450.5,
+      "date": "2026-10-20",
+      "business_purpose": "Taxi to the Makati client site for the site inspection.",
+      "project_site": "Makati Tower",
+      "receipt_name": "taxi-receipt.jpg",
+      "status": "Returned",
+      "notes": "The receipt is unreadable; attach a clearer photo.",
+      "payment_method": null,
+      "payment_date": null,
+      "payment_reference": null,
+      "submitted_at": "2026-10-20T03:12:00.000Z",
+      "updated_at": "2026-10-21T01:05:00.000Z",
+      "ess_reference": "ESS-CLM-88412"
+    }
+  ]
+}</pre><p><code>status</code>: <code>Pending Approval</code>, <code>Returned</code>, <code>Rejected</code>, <code>Approved</code> or <code>Reimbursed</code> (<code>Included in Payroll</code> only on older claims). <code>payment_method</code>: <code>Bank Transfer</code>, <code>Cash</code> or <code>E-wallet</code> (<code>Paid Separately</code> on older claims).</p></div><div class="ep" id="ep-63"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/ess/payslips</span></div><div class="ep-sum">An employee's released payslips, newest release first.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "runId": "4f0c...",
+      "period": "2026-10-01 to 2026-10-15",
+      "from": "2026-10-01",
+      "to": "2026-10-15",
+      "payDate": "2026-10-15",
+      "empId": "EMP-0001",
+      "name": "Ana Reyes",
+      "position": "Site Engineer",
+      "basic": 15000,
+      "allowance": 500,
+      "bonuses": 0,
+      "overtime": 360.58,
+      "holidayLeave": 0,
+      "gross": 15860.58,
+      "absences": 0,
+      "lateUt": 144.23,
+      "sss": 750,
+      "philhealth": 375,
+      "pagibig": 100,
+      "hmo": 250,
+      "tax": 611.15,
+      "loans": 0,
+      "other": 0,
+      "totalDeductions": 2230.38,
+      "net": 13630.2,
+      "employmentStatus": "Regular",
+      "earnings": [
+        {
+          "label": "Basic Salary",
+          "amount": 15000
+        }
+      ],
+      "deductionGroups": [
+        {
+          "title": "Statutory Contributions",
+          "lines": [
+            {
+              "label": "SSS Contribution",
+              "amount": 750
+            }
+          ],
+          "subtotal": 750
+        }
+      ],
+      "releasedAt": "2026-10-15T08:30:00.000Z"
+    }
+  ]
+}</pre><p><code>earnings</code> add up to <code>gross</code>; group <code>subtotal</code>s add up to <code>totalDeductions</code>. Groups appear in this order, only with an amount: Statutory Contributions, Withholding Tax, Attendance Deductions, Other Deductions. Payslips released before October 31, 2026 used earlier group names; those released before October 29, 2026 have no <code>employmentStatus</code>, <code>earnings</code> or <code>deductionGroups</code>, so show their register figures.</p></div><div class="ep" id="ep-64"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/ess/notifications</span></div><div class="ep-sum">An employee's latest 100 notifications, newest first.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "9b1e...",
+      "title": "Payslip available",
+      "message": "Your payslip for 2026-10-01 to 2026-10-15 is ready. Net pay ₱13,630.20.",
+      "run_id": "4f0c...",
+      "created_at": "2026-10-15T08:30:00.000Z",
+      "read_at": null
+    }
+  ]
+}</pre><p>Titles: <code>Payslip available</code>, <code>Claim approved</code>, <code>Claim returned for correction</code>, <code>Claim rejected</code>, <code>Claim reimbursed</code>. <code>run_id</code> is set only for payslips. ESS keeps its own read state.</p></div><div class="ep" id="ep-65"><div class="ep-head"><span class="m m-post">POST</span><span class="path">/integrations/ess/corrections</span></div><div class="ep-sum">Requests a payroll correction. Returns <code>201</code>, or <code>200</code> for a repeated <code>ess_reference</code>.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Request body</h4><table class=""><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td></td></tr><tr><td><code>run_id</code></td><td>Yes</td><td>The payslip's <code>runId</code>: an approved run that includes the employee.</td></tr><tr><td><code>request</code></td><td>Yes</td><td>What is wrong, 5 to 1,000 characters.</td></tr><tr><td><code>amount</code></td><td>Yes</td><td>More than 0, at most 1,000,000, up to 2 decimals.</td></tr><tr><td><code>ess_reference</code></td><td>Recommended</td><td>ESS's own id, up to 100 characters.</td></tr></tbody></table><h4>Example request</h4><pre>{
+  "employee_no": "EMP-0001",
+  "run_id": "c386ed75-...",
+  "request": "Overtime on Oct 20 (2 hours) is missing from my Oct 30 payslip.",
+  "amount": 450.5,
+  "ess_reference": "ESS-COR-1042"
+}</pre><p>Returns the correction, shaped as in the list below.</p></div><div class="ep" id="ep-66"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/integrations/ess/corrections</span></div><div class="ep-sum">An employee's corrections, newest first.</div><div class="ep-auth"><b>Access:</b> <code>X-API-Key</code> (ESS)</div><h4>Query parameters</h4><table class=""><thead><tr><th>Name</th><th>Required</th><th>Notes</th></tr></thead><tbody><tr><td><code>employee_no</code></td><td>Yes</td><td></td></tr></tbody></table><h4>Response</h4><pre>{
+  "data": [
+    {
+      "id": "uuid",
+      "correction_number": "COR-2026-0001",
+      "employee_no": "EMP-0001",
+      "employee_name": "Juan Dela Cruz",
+      "run_id": "c386ed75-...",
+      "period": "2026-10-10 to 2026-10-25",
+      "request": "Overtime on Oct 20 (2 hours) is missing from my Oct 30 payslip.",
+      "amount": 450.5,
+      "status": "Rejected",
+      "decision_comment": "The overtime was paid in the Oct 15 run.",
+      "decided_by": "Finance User",
+      "decided_at": "2026-10-27T02:10:00.000Z",
+      "completed_by": null,
+      "completed_at": null,
+      "completion_note": null,
+      "submitted_at": "2026-10-26T01:00:00.000Z",
+      "ess_reference": "ESS-COR-1042"
+    }
+  ]
+}</pre></div></section>
+<section id="ops"><h2>18. Health checks and configuration</h2><div class="ep" id="ep-67"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/health</span></div><div class="ep-sum">Confirms the service is running.</div><div class="ep-auth"><b>Access:</b> Public</div><h4>Response</h4><pre>{
+  "ok": true
+}</pre></div><div class="ep" id="ep-68"><div class="ep-head"><span class="m m-get">GET</span><span class="path">/api/health</span></div><div class="ep-sum">Row counts, to check which database the service reads.</div><div class="ep-auth"><b>Access:</b> Public</div><h4>Response</h4><pre>{
+  "ok": true,
+  "database": "pbms",
+  "employees": 45,
+  "attendance": 2240
+}</pre></div><h3>Environment variables</h3><table class=""><thead><tr><th>Variable</th><th>Purpose</th></tr></thead><tbody><tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string.</td></tr><tr><td><code>JWT_SECRET</code></td><td>Signs bearer tokens.</td></tr><tr><td><code>ADMIN_EMAIL</code>, <code>ADMIN_PASSWORD</code></td><td>Create the first Admin when the users table is empty.</td></tr><tr><td><code>ALLOWED_ORIGINS</code></td><td>Comma-separated browser origins allowed by CORS.</td></tr><tr><td><code>HR2_API_KEY</code>, <code>FINANCE_API_KEY</code>, <code>ESS_API_KEY</code></td><td>Integration keys, at least 32 characters each.</td></tr></tbody></table></section>
+</body></html>
